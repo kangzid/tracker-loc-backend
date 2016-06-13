@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\VehicleController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\GeofenceController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\NotificationController;
 
 // Public routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -21,6 +22,12 @@ Route::middleware('auth:sanctum')->group(function () {
     // Auth routes
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/profile', [AuthController::class, 'profile']);
+
+    // Notification routes
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/unread', [NotificationController::class, 'unread']);
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
 
     // Attendance routes
     Route::get('/attendances', [AttendanceController::class, 'index']);

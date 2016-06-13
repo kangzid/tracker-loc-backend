@@ -7,6 +7,7 @@ use App\Models\Task;
 use App\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Http;
 
 class TaskController extends Controller
 {
@@ -65,6 +66,9 @@ class TaskController extends Controller
             'priority' => $request->priority,
             'due_date' => $request->due_date,
         ]);
+
+        // Create notification for employee
+        $this->createNotification($request->assigned_to, $task);
 
         return response()->json($task->load(['employee.user', 'assignedBy']), 201);
     }
@@ -222,5 +226,20 @@ class TaskController extends Controller
         ]);
 
         return response()->json($task);
+    }
+
+    private function createNotification($employeeId, $task)
+    {
+        \App\Models\Notification::create([
+            'employee_id' => $employeeId,
+            'title' => 'Tugas Baru Hari Ini',
+            'message' => $task->title,
+            'type' => 'new_task',
+            'data' => json_encode([
+                'task_id' => $task->id,
+                'priority' => $task->priority,
+            ]),
+            'is_read' => false,
+        ]);
     }
 }

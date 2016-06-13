@@ -508,6 +508,32 @@ Content-Type: application/json
 }
 ```
 
+### Check Location (Before Attendance)
+
+```
+URL: http://localhost:8000/api/attendances/check-location
+Method: POST
+Authorization: Bearer {employee_token}
+Content-Type: application/json
+
+{
+    "latitude": -6.200000,
+    "longitude": 106.816666
+}
+
+// Response if inside office area:
+{
+    "is_in_office": true,
+    "message": "Anda berada di area kantor"
+}
+
+// Response if outside office area:
+{
+    "is_in_office": false,
+    "message": "Anda berada di luar area kantor"
+}
+```
+
 ### Get Today Attendance
 
 ```
@@ -515,6 +541,263 @@ URL: http://localhost:8000/api/attendances/today
 Method: GET
 Authorization: Bearer {employee_token}
 ```
+
+### Get Monthly Attendance
+
+```
+URL: http://localhost:8000/api/attendances/monthly
+Method: GET
+Authorization: Bearer {employee_token}
+```
+
+### Employee Dashboard
+
+```
+URL: http://localhost:8000/api/employee/dashboard
+Method: GET
+Authorization: Bearer {employee_token}
+```
+
+## 4. Notifications (No Firebase Required)
+
+### Get All Notifications
+
+```
+URL: http://localhost:8000/api/notifications
+Method: GET
+Authorization: Bearer {employee_token}
+```
+
+### Get Unread Notifications
+
+```
+URL: http://localhost:8000/api/notifications/unread
+Method: GET
+Authorization: Bearer {employee_token}
+
+// Use this endpoint for polling every 30 seconds in Flutter
+// Response:
+[
+    {
+        "id": 1,
+        "title": "Tugas Baru Hari Ini",
+        "message": "Survey Lokasi",
+        "type": "new_task",
+        "data": {
+            "task_id": 1,
+            "priority": "high"
+        },
+        "is_read": false,
+        "created_at": "2025-01-10T08:00:00.000000Z"
+    }
+]
+```
+
+### Mark Notification as Read
+
+```
+URL: http://localhost:8000/api/notifications/{id}/read
+Method: POST
+Authorization: Bearer {employee_token}
+```
+
+### Mark All Notifications as Read
+
+```
+URL: http://localhost:8000/api/notifications/read-all
+Method: POST
+Authorization: Bearer {employee_token}
+```
+
+## 5. Tasks (Employee)
+
+### Get My Tasks
+
+```
+URL: http://localhost:8000/api/my-tasks
+Method: GET
+Authorization: Bearer {employee_token}
+Query Parameters:
+- status (optional): pending, in_progress, completed, cancelled
+- priority (optional): low, medium, high, urgent
+
+// Example: Get pending tasks
+http://localhost:8000/api/my-tasks?status=pending
+```
+
+### Accept Task
+
+```
+URL: http://localhost:8000/api/tasks/{id}/accept
+Method: POST
+Authorization: Bearer {employee_token}
+```
+
+### Start Task
+
+```
+URL: http://localhost:8000/api/tasks/{id}/start
+Method: POST
+Authorization: Bearer {employee_token}
+```
+
+### Complete Task
+
+```
+URL: http://localhost:8000/api/tasks/{id}/complete
+Method: POST
+Authorization: Bearer {employee_token}
+Content-Type: application/json
+
+{
+    "completion_notes": "Task completed successfully"
+}
+```
+
+## 6. Location Tracking
+
+### Store Location (Auto Tracking)
+
+```
+URL: http://localhost:8000/api/locations
+Method: POST
+Authorization: Bearer {employee_token}
+Content-Type: application/json
+
+{
+    "latitude": -6.200000,
+    "longitude": 106.816666,
+    "trackable_type": "employee",
+    "trackable_id": 1,
+    "speed": 0,
+    "accuracy": 10
+}
+
+// Note: Only keeps latest location per employee (no accumulation)
+```
+
+### Live Tracking (Admin)
+
+```
+URL: http://localhost:8000/api/locations/live
+Method: GET
+Authorization: Bearer {admin_token}
+```
+
+### Employee Location History
+
+```
+URL: http://localhost:8000/api/locations/employee/{employee_id}/history
+Method: GET
+Authorization: Bearer {admin_token}
+Query Parameters:
+- date (optional): YYYY-MM-DD
+- start_date & end_date (optional): YYYY-MM-DD
+
+// Example: Get today's history
+http://localhost:8000/api/locations/employee/1/history?date=2025-01-10
+```
+
+### Share Location
+
+```
+URL: http://localhost:8000/api/locations/share
+Method: POST
+Authorization: Bearer {employee_token}
+Content-Type: application/json
+
+{
+    "latitude": -6.200000,
+    "longitude": 106.816666,
+    "duration": 60
+}
+
+// Response:
+{
+    "share_token": "abc123...",
+    "share_url": "http://localhost:8000/api/shared-location/abc123...",
+    "expires_at": "2025-01-10T09:00:00.000000Z"
+}
+```
+
+### Get Shared Location (Public)
+
+```
+URL: http://localhost:8000/api/shared-location/{token}
+Method: GET
+// No authorization required
+```
+
+## 7. Error Responses
+
+### Geofencing Error (Outside Office Area)
+
+```
+// When trying to check-in/out outside office area:
+HTTP 422 Unprocessable Entity
+{
+    "error": "OUTSIDE_GEOFENCE",
+    "message": "Anda berada di luar area kantor. Silakan mendekat ke area kantor untuk melakukan absensi.",
+    "title": "Lokasi Tidak Valid"
+}
+
+// Use this response to show popup notification in Flutter
+```
+
+## 8. Flutter Implementation Notes
+
+### Notification Polling
+```dart
+// Poll for notifications every 30 seconds
+Timer.periodic(Duration(seconds: 30), (timer) async {
+    final response = await http.get(
+        Uri.parse('$baseUrl/notifications/unread'),
+        headers: {'Authorization': 'Bearer $token'}
+    );
+    
+    if (response.statusCode == 200) {
+        final notifications = json.decode(response.body);
+        if (notifications.isNotEmpty) {
+            // Show popup notification
+            showNotificationPopup(notifications[0]);
+        }
+    }
+});
+```
+
+### Geofencing Check
+```dart
+// Check location before attendance
+final checkResponse = await http.post(
+    Uri.parse('$baseUrl/attendances/check-location'),
+    headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json'
+    },
+    body: json.encode({
+        'latitude': currentLat,
+        'longitude': currentLng
+    })
+);
+
+if (checkResponse.statusCode == 200) {
+    final result = json.decode(checkResponse.body);
+    if (result['is_in_office']) {
+        // Proceed with attendance
+    } else {
+        // Show error message
+    }
+}
+```
+
+## Base URL for Production
+
+When deployed to cPanel:
+```
+Base URL: https://yourdomain.com/api
+```
+
+Replace `http://localhost:8000/api` with your production URL.
 
 ### Get Monthly Attendance
 
