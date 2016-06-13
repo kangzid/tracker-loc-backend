@@ -1,160 +1,121 @@
 # LocaTrack Backend API
 
-Sistem tracking lokasi karyawan dan kendaraan operasional berbasis Laravel API.
+LocaTrack is a comprehensive backend API designed for employee attendance tracking, field task management, and real-time vehicle monitoring. Built with Laravel, it provides a robust solution for managing field operations with geofencing capabilities and role-based access control.
 
-## Fitur Utama
+## Key Features
 
-1. **Absensi berbasis lokasi (Geofencing)**
+### Authentication & Security
+- **Secure Authentication**: Implemented using Laravel Sanctum.
+- **Role-Based Access Control (RBAC)**: Distinct roles for Administrators and Employees with specific permission sets.
+- **Profile Management**: Secure profile updates and data retrieval.
 
-    - Check-in/out dengan validasi lokasi
-    - Deteksi otomatis area kantor
+### Attendance Management
+- **Geofence-Validated Attendance**: Check-in and check-out actions are validated against defined office geofences.
+- **Attendance History**: Detailed logs of daily attendance, including timestamps and location coordinates.
+- **Monthly Reports**: Aggregated attendance data for payroll and performance review.
+- **Administrative Override**: Admins can manage and correct attendance records if necessary.
 
-2. **Tracking kendaraan operasional**
+### Task Management
+- **Task Assignment**: Admins can assign tasks to specific employees with detailed descriptions, priorities, and due dates.
+- **Task Workflow**: Complete lifecycle management (Pending, Accepted, In Progress, Completed).
+- **Geo-Tagging**: Tasks can be linked to specific geographic locations.
+- **Progress Tracking**: Real-time status updates on assigned tasks.
 
-    - Real-time location tracking
-    - History perjalanan kendaraan
+### Location Services & Tracking
+- **Real-Time Tracking**: Live location monitoring for active employees and operational vehicles.
+- **Location History**: Historical path tracking for audit and route optimization.
+- **Live Location Sharing**: Generate temporary, secure links for sharing real-time location with external parties.
+- **Geofencing System**: Configurable geofences (e.g., Office, Client Sites) to automate attendance and alerts.
 
-3. **Live monitoring (karyawan & kendaraan)**
+### Fleet Management
+- **Vehicle Tracking**: Monitor the real-time status and location of company vehicles.
+- **Usage History**: Track vehicle usage patterns and active times.
 
-    - Dashboard real-time
-    - Status aktif karyawan dan kendaraan
+### Dashboard & Analytics
+- **Admin Dashboard**: High-level overview of total employees, active tasks, vehicle status, and daily attendance stats.
+- **Employee Dashboard**: Personal performance metrics, pending tasks, and attendance summary.
 
-4. **Geofencing otomatis**
+## Technology Stack
 
-    - Area kantor dan area kerja
-    - Notifikasi masuk/keluar area
+- **Framework**: Laravel 12
+- **Database**: MySQL
+- **Authentication**: Laravel Sanctum
+- **API Architecture**: RESTful API
 
-5. **Task assignment (tugas lapangan)**
+## Installation and Setup
 
-    - Assign tugas ke karyawan
-    - Tracking progress tugas
+### Prerequisites
+- PHP >= 8.2
+- Composer
+- MySQL
 
-6. **Sharing lokasi sementara**
+### Steps
 
-    - Share lokasi dengan token
-    - Expired time untuk keamanan
+1. **Clone the Repository**
+   ```bash
+   git clone https://github.com/kangzid/LocaTrack-backend.git
+   cd LocaTrack-backend
+   ```
 
-7. **Analitik & laporan otomatis**
-    - Dashboard statistik
-    - Laporan kehadiran dan produktivitas
+2. **Install Dependencies**
+   ```bash
+   composer install
+   ```
 
-## User Roles
+3. **Environment Configuration**
+   Copy the example environment file and configure your database credentials.
+   ```bash
+   cp .env.example .env
+   ```
+   Update the `.env` file with your database details:
+   ```env
+   DB_CONNECTION=mysql
+   DB_HOST=127.0.0.1
+   DB_PORT=3306
+   DB_DATABASE=locatrack
+   DB_USERNAME=root
+   DB_PASSWORD=
+   ```
 
--   **Admin/Manajer HR**: Kelola absensi & laporan
--   **Manajer Armada**: Lihat posisi kendaraan & jarak tempuh
--   **Karyawan Lapangan**: Absen, terima tugas
--   **Manajemen**: Ringkasan kinerja dari dashboard
+4. **Generate Application Key**
+   ```bash
+   php artisan key:generate
+   ```
 
-## Tech Stack
+5. **Run Migrations and Seeders**
+   Initialize the database with the required schema and default data.
+   ```bash
+   php artisan migrate --seed
+   ```
 
--   Laravel 12
--   MySQL Database
--   Laravel Sanctum (API Authentication)
--   RESTful API
-
-## Installation
-
-1. Clone repository
-
-```bash
-git clone <https://github.com/kangzid/LocaTrack-backend>
-cd LocaTrack-backend
-```
-
-2. Install dependencies
-
-```bash
-composer install
-```
-
-3. Setup environment
-
-```bash
-cp .env.example .env
-```
-
-4. Configure database di `.env`:
-
-```env
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=locatrack
-DB_USERNAME=root
-DB_PASSWORD=
-```
-
-5. Generate application key
-
-```bash
-php artisan key:generate
-```
-
-6. Run migrations dan seeder
-
-```bash
-php artisan migrate --seed
-```
-
-7. Start development server
-
-```bash
-php artisan serve
-```
-
-API akan tersedia di: `http://localhost:8000/api`
-
-## Database Schema
-
-### Users
-
--   id, name, email, password, role (admin/employee), is_active
-
-### Employees
-
--   id, user_id, employee_id, phone, address, department, position, latitude, longitude
-
-### Vehicles
-
--   id, vehicle_number, vehicle_type, brand, model, year, latitude, longitude, is_active
-
-### Attendances
-
--   id, employee_id, date, check_in, check_out, check_in_lat/lng, check_out_lat/lng, status
-
-### Tasks
-
--   id, title, description, assigned_to, assigned_by, latitude, longitude, status, priority, due_date
-
-### Locations (Polymorphic)
-
--   id, trackable_type, trackable_id, latitude, longitude, speed, accuracy, recorded_at
-
-### Geofences
-
--   id, name, center_lat, center_lng, radius, type, is_active
+6. **Start the Server**
+   ```bash
+   php artisan serve
+   ```
+   The API will be accessible at `http://localhost:8000/api`.
 
 ## API Documentation
 
-Lihat file `docs/API_DOCUMENTATION.md` untuk detail lengkap endpoint API.
-Untuk testing API, lihat `docs/API_TEST.md`.
+For detailed endpoint documentation, please refer to the following resources located in the `docs/` directory:
+- **API Overview**: `docs/API_DOCUMENTATION.md`
+- **Testing Guide**: `docs/API_TEST.md`
+- **Postman Collection**: `docs/postman_collection.json`
 
-## Default Users
+## Default Credentials
 
-### Admin
+### Administrator
+- **Email**: `admin@locatrack.com`
+- **Password**: `password123`
 
--   Email: admin@locatrack.com
--   Password: password123
-
-### Karyawan
-
--   Email: john@locatrack.com / jane@locatrack.com
--   Password: password123
+### Employee
+- **Email**: `john@locatrack.com`
+- **Password**: `password123`
 
 ## Contributing
 
-1. Fork repository
-2. Create feature branch
-3. Commit changes
-4. Push to branch
-5. Create Pull Request
+Contributions are welcome. Please follow the standard pull request workflow:
+1. Fork the repository.
+2. Create a feature branch.
+3. Commit your changes.
+4. Push to the branch.
+5. Create a Pull Request.
