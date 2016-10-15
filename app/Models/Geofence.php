@@ -10,6 +10,7 @@ class Geofence extends Model
     use HasFactory;
 
     protected $fillable = [
+        'admin_id',
         'name',
         'description',
         'center_lat',
@@ -32,6 +33,11 @@ class Geofence extends Model
     {
         $distance = $this->calculateDistance($latitude, $longitude, $this->center_lat, $this->center_lng);
         return $distance <= $this->radius;
+    }
+
+    public function admin()
+    {
+        return $this->belongsTo(User::class, 'admin_id');
     }
 
     private function calculateDistance($lat1, $lon1, $lat2, $lon2)

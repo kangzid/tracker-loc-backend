@@ -56,12 +56,12 @@ class CheckSubscription
 
         // Cek kuota berdasarkan tipe yang diminta
         if ($type === 'employee') {
-            // Tahap 1 (single-admin): hitung semua employee yang ada di sistem
-            $currentCount = \App\Models\Employee::count();
+            // Hitung employee milik admin ini saja (tenant isolation)
+            $currentCount = \App\Models\Employee::where('admin_id', $user->id)->count();
 
             if ($currentCount >= $subscription->max_employees) {
                 return response()->json([
-                    'message'       => "Kuota karyawan Anda sudah penuh ({$subscription->max_employees} dari {$subscription->max_employees}). Upgrade paket untuk menambah lebih banyak.",
+                    'message'       => "Kuota karyawan Anda sudah penuh ({$currentCount} dari {$subscription->max_employees}). Upgrade paket untuk menambah lebih banyak.",
                     'error_code'    => 'EMPLOYEE_QUOTA_EXCEEDED',
                     'current'       => $currentCount,
                     'max'           => $subscription->max_employees,
@@ -70,11 +70,12 @@ class CheckSubscription
         }
 
         if ($type === 'vehicle') {
-            $currentCount = \App\Models\Vehicle::count();
+            // Hitung vehicle milik admin ini saja (tenant isolation)
+            $currentCount = \App\Models\Vehicle::where('admin_id', $user->id)->count();
 
             if ($currentCount >= $subscription->max_vehicles) {
                 return response()->json([
-                    'message'       => "Kuota kendaraan Anda sudah penuh ({$subscription->max_vehicles} dari {$subscription->max_vehicles}). Upgrade paket untuk menambah lebih banyak.",
+                    'message'       => "Kuota kendaraan Anda sudah penuh ({$currentCount} dari {$subscription->max_vehicles}). Upgrade paket untuk menambah lebih banyak.",
                     'error_code'    => 'VEHICLE_QUOTA_EXCEEDED',
                     'current'       => $currentCount,
                     'max'           => $subscription->max_vehicles,

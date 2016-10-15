@@ -14,7 +14,8 @@ class GeofenceController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $geofences = Geofence::all();
+        $adminId = $request->user()->id;
+        $geofences = Geofence::where('admin_id', $adminId)->get();
         return response()->json($geofences);
     }
 
@@ -32,13 +33,21 @@ class GeofenceController extends Controller
             'type' => 'required|in:office,work_area,restricted',
         ]);
 
-        $geofence = Geofence::create($request->all());
+        $geofence = Geofence::create(array_merge(
+            $request->all(),
+            ['admin_id' => $request->user()->id]
+        ));
         return response()->json($geofence, 201);
     }
 
-    public function show($id)
+    public function show(Request $request, $id)
     {
-        $geofence = Geofence::findOrFail($id);
+        if (!$request->user()->isAdmin()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $adminId = $request->user()->id;
+        $geofence = Geofence::where('admin_id', $adminId)->findOrFail($id);
         return response()->json($geofence);
     }
 
@@ -48,7 +57,8 @@ class GeofenceController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $geofence = Geofence::findOrFail($id);
+        $adminId = $request->user()->id;
+        $geofence = Geofence::where('admin_id', $adminId)->findOrFail($id);
         $geofence->update($request->all());
         return response()->json($geofence);
     }
@@ -59,7 +69,8 @@ class GeofenceController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $geofence = Geofence::findOrFail($id);
+        $adminId = $request->user()->id;
+        $geofence = Geofence::where('admin_id', $adminId)->findOrFail($id);
         $geofence->delete();
         return response()->json(['message' => 'Geofence deleted']);
     }

@@ -62,4 +62,22 @@ class User extends Authenticatable
     {
         return $this->role === 'superadmin';
     }
+
+    /**
+     * Get admin_id for tenant isolation
+     * - If user is admin, return their own ID
+     * - If user is employee, return their admin's ID from employee record
+     */
+    public function getAdminId()
+    {
+        if ($this->isAdmin()) {
+            return $this->id;
+        }
+        
+        if ($this->isEmployee() && $this->employee) {
+            return $this->employee->admin_id;
+        }
+        
+        return null;
+    }
 }

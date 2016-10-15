@@ -17,8 +17,12 @@ class AttendanceController extends Controller
         $user = $request->user();
         
         if ($user->isAdmin()) {
-            // Admin can see all attendances
+            $adminId = $user->id;
+            // Admin can see all attendances from their employees only
             $attendances = Attendance::with('employee.user')
+                ->whereHas('employee', function($q) use ($adminId) {
+                    $q->where('admin_id', $adminId);
+                })
                 ->orderBy('date', 'desc')
                 ->paginate(20);
         } else {
@@ -54,7 +58,7 @@ class AttendanceController extends Controller
         }
 
         // Check geofencing first BEFORE creating any record in the database
-        $isInOffice = $this->checkGeofencing($request->latitude, $request->longitude);
+        $isInOffice = $this->checkGeofencing($request->latitude, $request->longitude, $employee->admin_id);
         
         // Return error if outside office area
         if (!$isInOffice) {
@@ -261,7 +265,12 @@ class AttendanceController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $isInOffice = $this->checkGeofencing($request->latitude, $request->longitude);
+        $employee = $request->user()->employee;
+        if (!$employee) {
+            return response()->json(['message' => 'Employee profile not found'], 404);
+        }
+
+        $isInOffice = $this->checkGeofencing($request->latitude, $request->longitude, $employee->admin_id);
         
         return response()->json([
             'is_in_office' => $isInOffice,
@@ -282,10 +291,11 @@ class AttendanceController extends Controller
         ]);
     }
 
-    private function checkGeofencing($latitude, $longitude)
+    private function checkGeofencing($latitude, $longitude, $adminId)
     {
         $geofences = Geofence::where('is_active', true)
             ->where('type', 'office')
+            ->where('admin_id', $adminId)
             ->get();
 
         foreach ($geofences as $geofence) {

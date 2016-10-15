@@ -64,15 +64,39 @@ class LocationController extends Controller
 
     public function liveTracking(Request $request)
     {
-        $employees = Employee::with(['user', 'latestLocation'])
-            ->whereHas('user', function($q) {
-                $q->where('is_active', true);
-            })
-            ->get();
+        $user = $request->user();
+        
+        if ($user->isAdmin()) {
+            // Admin hanya bisa lihat employee & vehicle miliknya sendiri
+            $adminId = $user->id;
+            
+            $employees = Employee::with(['user', 'latestLocation'])
+                ->where('admin_id', $adminId)
+                ->whereHas('user', function($q) {
+                    $q->where('is_active', true);
+                })
+                ->get();
 
-        $vehicles = Vehicle::with('latestLocation')
-            ->where('is_active', true)
-            ->get();
+            $vehicles = Vehicle::with('latestLocation')
+                ->where('admin_id', $adminId)
+                ->where('is_active', true)
+                ->get();
+        } else {
+            // Employee hanya bisa lihat dirinya sendiri dan vehicle di tenant yang sama
+            $employee = $user->employee;
+            if (!$employee) {
+                return response()->json(['message' => 'Employee profile not found'], 404);
+            }
+            
+            $employees = Employee::with(['user', 'latestLocation'])
+                ->where('id', $employee->id)
+                ->get();
+
+            $vehicles = Vehicle::with('latestLocation')
+                ->where('admin_id', $employee->admin_id)
+                ->where('is_active', true)
+                ->get();
+        }
 
         return response()->json([
             'employees' => $employees,
@@ -82,6 +106,24 @@ class LocationController extends Controller
 
     public function employeeHistory(Request $request, $employeeId)
     {
+        $user = $request->user();
+        
+        // Verify employee belongs to this admin's tenant
+        if ($user->isAdmin()) {
+            $employee = Employee::where('admin_id', $user->id)
+                ->where('id', $employeeId)
+                ->first();
+            
+            if (!$employee) {
+                return response()->json(['message' => 'Employee not found or unauthorized'], 404);
+            }
+        } else {
+            // Employee can only see their own history
+            if (!$user->employee || $user->employee->id != $employeeId) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+        }
+        
         $validator = Validator::make($request->all(), [
             'date' => 'nullable|date',
             'start_date' => 'nullable|date',
@@ -109,6 +151,33 @@ class LocationController extends Controller
 
     public function vehicleHistory(Request $request, $vehicleId)
     {
+        $user = $request->user();
+        
+        // Verify vehicle belongs to this admin's tenant
+        if ($user->isAdmin()) {
+            $vehicle = Vehicle::where('admin_id', $user->id)
+                ->where('id', $vehicleId)
+                ->first();
+            
+            if (!$vehicle) {
+                return response()->json(['message' => 'Vehicle not found or unauthorized'], 404);
+            }
+        } else {
+            // Employee can only see vehicles in their tenant
+            $employee = $user->employee;
+            if (!$employee) {
+                return response()->json(['message' => 'Employee profile not found'], 404);
+            }
+            
+            $vehicle = Vehicle::where('admin_id', $employee->admin_id)
+                ->where('id', $vehicleId)
+                ->first();
+            
+            if (!$vehicle) {
+                return response()->json(['message' => 'Vehicle not found or unauthorized'], 404);
+            }
+        }
+        
         $validator = Validator::make($request->all(), [
             'date' => 'nullable|date',
             'start_date' => 'nullable|date',

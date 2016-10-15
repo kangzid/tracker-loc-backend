@@ -16,7 +16,18 @@ class UserController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $users = User::with('employee')->get();
+        // Admin hanya bisa lihat users (employees) di tenant mereka sendiri
+        $adminId = $request->user()->id;
+        $users = User::with('employee')
+            ->where(function($q) use ($adminId) {
+                // Hanya tampilkan employee milik admin ini
+                $q->whereHas('employee', function($subQ) use ($adminId) {
+                    $subQ->where('admin_id', $adminId);
+                })
+                // Atau admin itu sendiri
+                ->orWhere('id', $adminId);
+            })
+            ->get();
         return response()->json($users);
     }
 
@@ -26,7 +37,11 @@ class UserController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $admins = User::where('role', 'admin')->get();
+        // Admin hanya bisa lihat dirinya sendiri, TIDAK bisa lihat admin lain atau superadmin
+        $adminId = $request->user()->id;
+        $admins = User::where('role', 'admin')
+            ->where('id', $adminId)
+            ->get();
         return response()->json($admins);
     }
 
@@ -36,7 +51,22 @@ class UserController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $user = User::with('employee')->find($id);
+        $adminId = $request->user()->id;
+        
+        // Admin hanya bisa lihat detail user di tenant mereka atau diri sendiri
+        $user = User::with('employee')
+            ->where(function($q) use ($adminId, $id) {
+                // User adalah admin itu sendiri
+                $q->where('id', $id)->where('id', $adminId)
+                // Atau employee milik admin ini
+                ->orWhere(function($subQ) use ($adminId, $id) {
+                    $subQ->where('id', $id)
+                        ->whereHas('employee', function($empQ) use ($adminId) {
+                            $empQ->where('admin_id', $adminId);
+                        });
+                });
+            })
+            ->first();
         
         if (!$user) {
             return response()->json(['message' => 'User not found'], 404);
@@ -51,7 +81,25 @@ class UserController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $user = User::findOrFail($id);
+        $adminId = $request->user()->id;
+        
+        // Verify user belongs to this admin's tenant
+        $user = User::where(function($q) use ($adminId, $id) {
+                // User adalah admin itu sendiri
+                $q->where('id', $id)->where('id', $adminId)
+                // Atau employee milik admin ini
+                ->orWhere(function($subQ) use ($adminId, $id) {
+                    $subQ->where('id', $id)
+                        ->whereHas('employee', function($empQ) use ($adminId) {
+                            $empQ->where('admin_id', $adminId);
+                        });
+                });
+            })
+            ->first();
+        
+        if (!$user) {
+            return response()->json(['message' => 'User not found or unauthorized'], 404);
+        }
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
@@ -87,7 +135,21 @@ class UserController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $user = User::findOrFail($id);
+        $adminId = $request->user()->id;
+        
+        // Verify user belongs to this admin's tenant
+        $user = User::where(function($q) use ($adminId, $id) {
+                // Employee milik admin ini (admin tidak bisa delete diri sendiri)
+                $q->where('id', $id)
+                    ->whereHas('employee', function($empQ) use ($adminId) {
+                        $empQ->where('admin_id', $adminId);
+                    });
+            })
+            ->first();
+        
+        if (!$user) {
+            return response()->json(['message' => 'User not found or unauthorized'], 404);
+        }
         
         // Prevent deleting self
         if ($user->id === $request->user()->id) {

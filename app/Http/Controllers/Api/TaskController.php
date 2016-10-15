@@ -16,7 +16,9 @@ class TaskController extends Controller
         $user = $request->user();
         
         if ($user->isAdmin()) {
+            $adminId = $user->id;
             $tasks = Task::with(['employee.user', 'assignedBy'])
+                ->where('admin_id', $adminId)
                 ->orderBy('created_at', 'desc')
                 ->paginate(20);
         } else {
@@ -55,7 +57,18 @@ class TaskController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
+        // Verify employee belongs to this admin
+        $adminId = $request->user()->id;
+        $employee = Employee::where('admin_id', $adminId)
+            ->where('id', $request->assigned_to)
+            ->first();
+        
+        if (!$employee) {
+            return response()->json(['message' => 'Employee not found or does not belong to your organization'], 404);
+        }
+
         $task = Task::create([
+            'admin_id' => $adminId,
             'title' => $request->title,
             'description' => $request->description,
             'assigned_to' => $request->assigned_to,
@@ -239,7 +252,9 @@ class TaskController extends Controller
 
     private function createNotification($employeeId, $task)
     {
+        $employee = Employee::find($employeeId);
         \App\Models\Notification::create([
+            'admin_id' => $employee->admin_id,
             'employee_id' => $employeeId,
             'title' => 'Tugas Baru Hari Ini',
             'message' => $task->title,

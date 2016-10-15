@@ -99,14 +99,25 @@ Route::middleware('auth:sanctum')->group(function () {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
+        $adminId = $request->user()->id;
+        
         $stats = [
-            'total_employees' => \App\Models\Employee::count(),
-            'active_employees' => \App\Models\User::where('role', 'employee')->where('is_active', true)->count(),
-            'total_vehicles' => \App\Models\Vehicle::count(),
-            'active_vehicles' => \App\Models\Vehicle::where('is_active', true)->count(),
-            'today_attendances' => \App\Models\Attendance::whereDate('date', today())->count(),
-            'pending_tasks' => \App\Models\Task::where('status', 'pending')->count(),
-            'in_progress_tasks' => \App\Models\Task::where('status', 'in_progress')->count(),
+            'total_employees' => \App\Models\Employee::where('admin_id', $adminId)->count(),
+            'active_employees' => \App\Models\Employee::where('admin_id', $adminId)
+                ->whereHas('user', function($q) {
+                    $q->where('is_active', true);
+                })->count(),
+            'total_vehicles' => \App\Models\Vehicle::where('admin_id', $adminId)->count(),
+            'active_vehicles' => \App\Models\Vehicle::where('admin_id', $adminId)
+                ->where('is_active', true)->count(),
+            'today_attendances' => \App\Models\Attendance::whereDate('date', today())
+                ->whereHas('employee', function($q) use ($adminId) {
+                    $q->where('admin_id', $adminId);
+                })->count(),
+            'pending_tasks' => \App\Models\Task::where('admin_id', $adminId)
+                ->where('status', 'pending')->count(),
+            'in_progress_tasks' => \App\Models\Task::where('admin_id', $adminId)
+                ->where('status', 'in_progress')->count(),
         ];
 
         return response()->json($stats);

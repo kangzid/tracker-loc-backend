@@ -16,7 +16,9 @@ class VehicleController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
+        $adminId = $request->user()->id;
         $vehicles = Vehicle::with('latestLocation')
+            ->where('admin_id', $adminId)
             ->orderBy('created_at', 'desc')
             ->paginate(20);
 
@@ -41,14 +43,24 @@ class VehicleController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $vehicle = Vehicle::create($request->all());
+        $vehicle = Vehicle::create(array_merge(
+            $request->all(),
+            ['admin_id' => $request->user()->id]
+        ));
 
         return response()->json($vehicle, 201);
     }
 
-    public function show($id)
+    public function show(Request $request, $id)
     {
-        $vehicle = Vehicle::with('latestLocation')->findOrFail($id);
+        if (!$request->user()->isAdmin()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $adminId = $request->user()->id;
+        $vehicle = Vehicle::with('latestLocation')
+            ->where('admin_id', $adminId)
+            ->findOrFail($id);
         return response()->json($vehicle);
     }
 
@@ -58,7 +70,8 @@ class VehicleController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $vehicle = Vehicle::findOrFail($id);
+        $adminId = $request->user()->id;
+        $vehicle = Vehicle::where('admin_id', $adminId)->findOrFail($id);
 
         $validator = Validator::make($request->all(), [
             'vehicle_number' => 'sometimes|required|string|unique:vehicles,vehicle_number,' . $id,
@@ -84,24 +97,37 @@ class VehicleController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $vehicle = Vehicle::findOrFail($id);
+        $adminId = $request->user()->id;
+        $vehicle = Vehicle::where('admin_id', $adminId)->findOrFail($id);
         $vehicle->delete();
 
         return response()->json(['message' => 'Vehicle deleted successfully']);
     }
 
-    public function activeVehicles()
+    public function activeVehicles(Request $request)
     {
+        if (!$request->user()->isAdmin()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $adminId = $request->user()->id;
         $vehicles = Vehicle::with('latestLocation')
+            ->where('admin_id', $adminId)
             ->where('is_active', true)
             ->get();
 
         return response()->json($vehicles);
     }
 
-    public function inactiveVehicles()
+    public function inactiveVehicles(Request $request)
     {
+        if (!$request->user()->isAdmin()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $adminId = $request->user()->id;
         $vehicles = Vehicle::with('latestLocation')
+            ->where('admin_id', $adminId)
             ->where('is_active', false)
             ->get();
 
@@ -125,7 +151,8 @@ class VehicleController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $vehicle = Vehicle::findOrFail($id);
+        $adminId = $request->user()->id;
+        $vehicle = Vehicle::where('admin_id', $adminId)->findOrFail($id);
         
         // Update vehicle table
         $vehicle->update([

@@ -10,6 +10,7 @@ class Vehicle extends Model
     use HasFactory;
 
     protected $fillable = [
+        'admin_id',
         'vehicle_number',
         'vehicle_type',
         'brand',
@@ -39,5 +40,10 @@ class Vehicle extends Model
     public function latestLocation()
     {
         return $this->morphOne(Location::class, 'trackable')->latest('recorded_at');
+    }
+
+    public function admin()
+    {
+        return $this->belongsTo(User::class, 'admin_id');
     }
 }

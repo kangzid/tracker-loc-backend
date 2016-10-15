@@ -127,9 +127,9 @@ class ProvisionController extends Controller
             $subscription->update(['status' => 'expired']);
         }
 
-        // Hitung usage saat ini
-        $currentEmployees = \App\Models\Employee::count();
-        $currentVehicles  = \App\Models\Vehicle::count();
+        // Hitung usage saat ini (hanya milik admin ini - tenant isolation)
+        $currentEmployees = \App\Models\Employee::where('admin_id', $user->id)->count();
+        $currentVehicles  = \App\Models\Vehicle::where('admin_id', $user->id)->count();
 
         return response()->json([
             'has_subscription'  => true,

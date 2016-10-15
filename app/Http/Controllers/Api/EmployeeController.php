@@ -16,7 +16,10 @@ class EmployeeController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $employees = Employee::with('user')->get();
+        $adminId = $request->user()->id;
+        $employees = Employee::with('user')
+            ->where('admin_id', $adminId)
+            ->get();
         return response()->json($employees);
     }
 
@@ -49,6 +52,7 @@ class EmployeeController extends Controller
             $employee = null;
             if ($request->role === 'employee') {
                 $employee = Employee::create([
+                    'admin_id' => $request->user()->id,
                     'user_id' => $user->id,
                     'employee_id' => $request->employee_id,
                     'phone' => $request->phone,
@@ -81,7 +85,10 @@ class EmployeeController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $employee = Employee::with('user')->find($id);
+        $adminId = $request->user()->id;
+        $employee = Employee::with('user')
+            ->where('admin_id', $adminId)
+            ->find($id);
         
         if (!$employee) {
             return response()->json(['message' => 'Employee not found'], 404);
@@ -96,7 +103,8 @@ class EmployeeController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $employee = Employee::find($id);
+        $adminId = $request->user()->id;
+        $employee = Employee::where('admin_id', $adminId)->find($id);
         
         if (!$employee) {
             return response()->json(['message' => 'Employee not found'], 404);
@@ -146,7 +154,8 @@ class EmployeeController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $employee = Employee::find($id);
+        $adminId = $request->user()->id;
+        $employee = Employee::where('admin_id', $adminId)->find($id);
         
         if (!$employee) {
             return response()->json(['message' => 'Employee not found'], 404);
