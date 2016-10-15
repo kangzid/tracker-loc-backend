@@ -15,12 +15,12 @@ class AttendanceController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        
+
         if ($user->isAdmin()) {
             $adminId = $user->id;
             // Admin can see all attendances from their employees only
             $attendances = Attendance::with('employee.user')
-                ->whereHas('employee', function($q) use ($adminId) {
+                ->whereHas('employee', function ($q) use ($adminId) {
                     $q->where('admin_id', $adminId);
                 })
                 ->orderBy('date', 'desc')
@@ -59,7 +59,7 @@ class AttendanceController extends Controller
 
         // Check geofencing first BEFORE creating any record in the database
         $isInOffice = $this->checkGeofencing($request->latitude, $request->longitude, $employee->admin_id);
-        
+
         // Return error if outside office area
         if (!$isInOffice) {
             return response()->json([
@@ -111,7 +111,7 @@ class AttendanceController extends Controller
     {
         $user = auth()->user();
         $attendance = Attendance::with('employee.user')->findOrFail($id);
-        
+
         // Check authorization
         if ($user->isAdmin()) {
             // Admin can only view attendances of their employees
@@ -124,7 +124,7 @@ class AttendanceController extends Controller
                 return response()->json(['message' => 'Unauthorized'], 403);
             }
         }
-        
+
         return response()->json($attendance);
     }
 
@@ -164,13 +164,13 @@ class AttendanceController extends Controller
         if (!$request->user()->isAdmin()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
-        
+
         // Verify employee belongs to this admin's tenant
         $adminId = $request->user()->id;
         $employee = \App\Models\Employee::where('id', $employeeId)
             ->where('admin_id', $adminId)
             ->first();
-        
+
         if (!$employee) {
             return response()->json(['message' => 'Employee not found or does not belong to your tenant'], 404);
         }
@@ -186,7 +186,7 @@ class AttendanceController extends Controller
 
         $month = $request->month ?? Carbon::now()->month;
         $year = $request->year ?? Carbon::now()->year;
-        
+
         // Get all days in the month
         $daysInMonth = Carbon::create($year, $month)->daysInMonth;
         $startDate = Carbon::create($year, $month, 1);
@@ -203,10 +203,10 @@ class AttendanceController extends Controller
         for ($day = 1; $day <= $daysInMonth; $day++) {
             $date = Carbon::create($year, $month, $day)->format('Y-m-d');
             // Find attendance by comparing formatted dates (handle timezone properly)
-            $attendance = $attendances->first(function($item) use ($date) {
+            $attendance = $attendances->first(function ($item) use ($date) {
                 return $item->date->format('Y-m-d') === $date;
             });
-            
+
             $result[] = [
                 'date' => $date,
                 'day_name' => Carbon::create($year, $month, $day)->format('l'),
@@ -229,12 +229,12 @@ class AttendanceController extends Controller
         }
 
         $attendance = Attendance::findOrFail($id);
-        
+
         // Verify admin owns this attendance (via employee ownership)
         if ($attendance->employee->admin_id !== $request->user()->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
-        
+
         // Only allow edit within 7 days
         if (Carbon::parse($attendance->date)->diffInDays(Carbon::now()) > 7) {
             return response()->json(['message' => 'Can only edit attendance within 7 days'], 403);
@@ -250,7 +250,7 @@ class AttendanceController extends Controller
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
-        
+
         $updateData = [
             'status' => $request->status,
             'notes' => $request->notes,
@@ -276,12 +276,12 @@ class AttendanceController extends Controller
         }
 
         $attendance = Attendance::findOrFail($id);
-        
+
         // Verify admin owns this attendance (via employee ownership)
         if ($attendance->employee->admin_id !== $request->user()->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
-        
+
         // Only allow delete within 7 days
         if (Carbon::parse($attendance->date)->diffInDays(Carbon::now()) > 7) {
             return response()->json(['message' => 'Can only delete attendance within 7 days'], 403);
@@ -320,7 +320,7 @@ class AttendanceController extends Controller
         $employee = \App\Models\Employee::where('id', $request->employee_id)
             ->where('admin_id', $adminId)
             ->first();
-        
+
         if (!$employee) {
             return response()->json(['message' => 'Employee not found or does not belong to your tenant'], 404);
         }
@@ -381,7 +381,7 @@ class AttendanceController extends Controller
         }
 
         $isInOffice = $this->checkGeofencing($request->latitude, $request->longitude, $employee->admin_id);
-        
+
         return response()->json([
             'is_in_office' => $isInOffice,
             'message' => $isInOffice ? 'Anda berada di area kantor' : 'Anda berada di luar area kantor'
@@ -395,10 +395,10 @@ class AttendanceController extends Controller
         ]);
 
         $beforeDate = $request->input('before_date');
-        
+
         // Convert string to Carbon date for proper comparison
         $beforeDateCarbon = Carbon::createFromFormat('Y-m-d', $beforeDate)->startOfDay();
-        
+
         // Delete attendances before the specified date, only for this admin's tenant
         // Using whereHas to filter by employee's admin_id (tenant isolation)
         $deletedCount = Attendance::whereHas('employee', function ($query) use ($request) {
@@ -406,7 +406,7 @@ class AttendanceController extends Controller
         })
             ->where('date', '<', $beforeDateCarbon)
             ->delete();
-        
+
         return response()->json([
             'message' => 'Old attendances cleaned up successfully',
             'deleted_count' => $deletedCount,

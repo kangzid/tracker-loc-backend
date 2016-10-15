@@ -3,43 +3,49 @@
 ## ✅ Backend Implementation (Completed)
 
 ### 1. Cascade Delete Vehicle Locations
+
 - [x] Update `VehicleController@destroy()` method
 - [x] Query delete semua `Location` dengan `trackable_type=Vehicle` dan `trackable_id=$vehicleId`
 - [x] Delete vehicle record setelah locations dihapus
 - **File**: `app/Http/Controllers/Api/VehicleController.php`
 
 ### 2. WebSocket Event Broadcasting
+
 - [x] Create `LocationUpdated` event class
-  - [x] Implement `ShouldBroadcast` interface
-  - [x] Private channel: `location.{trackableType}.{trackableId}`
-  - [x] Broadcast payload dengan latitude, longitude, speed, accuracy, etc
-  - **File**: `app/Events/LocationUpdated.php`
+    - [x] Implement `ShouldBroadcast` interface
+    - [x] Private channel: `location.{trackableType}.{trackableId}`
+    - [x] Broadcast payload dengan latitude, longitude, speed, accuracy, etc
+    - **File**: `app/Events/LocationUpdated.php`
 
 ### 3. Channel Authorization
+
 - [x] Create `LocationChannel` broadcasting class
-  - [x] Admin: bisa subscribe ke employee dan vehicle milik tenant mereka
-  - [x] Employee: hanya ke diri sendiri dan vehicle di tenant mereka
-  - [x] Prevent unauthorized access
-  - **File**: `app/Broadcasting/LocationChannel.php`
+    - [x] Admin: bisa subscribe ke employee dan vehicle milik tenant mereka
+    - [x] Employee: hanya ke diri sendiri dan vehicle di tenant mereka
+    - [x] Prevent unauthorized access
+    - **File**: `app/Broadcasting/LocationChannel.php`
 
 ### 4. Routes & Broadcasting Setup
+
 - [x] Register channel di `routes/channels.php`
-  - [x] Channel pattern: `location.{trackableType}.{trackableId}`
-  - [x] Authorization via `LocationChannel@join()`
-  - **File**: `routes/channels.php`
+    - [x] Channel pattern: `location.{trackableType}.{trackableId}`
+    - [x] Authorization via `LocationChannel@join()`
+    - **File**: `routes/channels.php`
 
 ### 5. Auto-Broadcast Location Updates
+
 - [x] Update `LocationController@store()` method
-  - [x] Fire `LocationUpdated` event saat location baru diterima
-  - [x] Broadcast ke private channel
-  - **File**: `app/Http/Controllers/Api/LocationController.php`
+    - [x] Fire `LocationUpdated` event saat location baru diterima
+    - [x] Broadcast ke private channel
+    - **File**: `app/Http/Controllers/Api/LocationController.php`
 
 - [x] Update `VehicleController@updateLocation()` method
-  - [x] Fire `LocationUpdated` event saat admin update vehicle location
-  - [x] Broadcast ke private channel
-  - **File**: `app/Http/Controllers/Api/VehicleController.php`
+    - [x] Fire `LocationUpdated` event saat admin update vehicle location
+    - [x] Broadcast ke private channel
+    - **File**: `app/Http/Controllers/Api/VehicleController.php`
 
 ### 6. Documentation
+
 - [x] Create `docs/WEBSOCKET_REALTIME_TRACKING.md` - Dokumentasi lengkap
 - [x] Create `docs/WEBSOCKET_QUICK_SETUP.md` - Quick reference & setup guide
 - [x] Create `docs/IMPLEMENTATION_CHECKLIST.md` - File ini
@@ -49,6 +55,7 @@
 ## 📝 How to Test Backend
 
 ### 1. Test Cascade Delete
+
 ```bash
 # Login as admin
 curl -X POST http://localhost:8000/api/login \
@@ -65,6 +72,7 @@ SELECT * FROM locations WHERE trackable_type='App\Models\Vehicle' AND trackable_
 ```
 
 ### 2. Test WebSocket Broadcasting
+
 ```bash
 # Start WebSocket server
 php artisan websockets:serve
@@ -90,6 +98,7 @@ curl -X POST http://localhost:8000/api/locations \
 ## 🎨 Frontend Implementation (Next Steps)
 
 ### Svelte (Web App)
+
 - [ ] Install `laravel-echo` dan `pusher-js`
 - [ ] Setup Echo client dengan WebSocket config
 - [ ] Subscribe ke `location.employee.*` channels
@@ -98,6 +107,7 @@ curl -X POST http://localhost:8000/api/locations \
 - [ ] Update map markers real-time
 
 ### Flutter (Mobile App)
+
 - [ ] Add `laravel_echo` package ke `pubspec.yaml`
 - [ ] Setup Flutter Echo client
 - [ ] Subscribe ke location channels
@@ -109,20 +119,23 @@ curl -X POST http://localhost:8000/api/locations \
 ## 🔧 Production Setup (Prerequisites)
 
 ### Server Requirements
+
 - [ ] WebSocket port 6001 open (firewall)
 - [ ] PHP 8.0+ dengan ext-pcntl (untuk websockets:serve)
 - [ ] Redis (optional, untuk scale WebSocket server)
 
 ### Option 1: Self-Hosted WebSocket (Recommended)
+
 - [ ] Install `beyondco/laravel-websockets`
 - [ ] Setup `config/broadcasting.php` untuk pusher driver
 - [ ] Configure `.env` dengan WebSocket credentials
 - [ ] Setup supervisor untuk daemon process
-  - File: `/etc/supervisor/conf.d/laravel-websockets.conf`
-  - Command: `php artisan websockets:serve`
-  - Autostart: true
+    - File: `/etc/supervisor/conf.d/laravel-websockets.conf`
+    - Command: `php artisan websockets:serve`
+    - Autostart: true
 
 ### Option 2: Pusher Cloud Service
+
 - [ ] Sign up di pusher.com
 - [ ] Get credentials (APP_ID, APP_KEY, APP_SECRET)
 - [ ] Update `.env` dengan Pusher credentials
@@ -133,10 +146,12 @@ curl -X POST http://localhost:8000/api/locations \
 ## 📊 Database
 
 ### No Migration Needed
+
 - Location table sudah ada
 - Tidak ada schema changes
 
 ### Data Flow
+
 ```
 POST /api/locations
     ↓
@@ -154,12 +169,14 @@ Client receives event & updates map
 ## 🚀 Deployment Checklist
 
 ### Pre-Deployment
+
 - [ ] Test cascade delete in staging
 - [ ] Test WebSocket broadcasting in staging
 - [ ] Load test WebSocket with multiple concurrent connections
 - [ ] Setup monitoring/logging untuk WebSocket server
 
 ### Deployment
+
 - [ ] `php artisan migrate`
 - [ ] `composer install --no-dev`
 - [ ] Update `.env` production settings
@@ -168,6 +185,7 @@ Client receives event & updates map
 - [ ] Test end-to-end dengan Svelte/Flutter client
 
 ### Post-Deployment
+
 - [ ] Monitor WebSocket server logs
 - [ ] Monitor database for growth (Location table)
 - [ ] Setup automated cleanup untuk old locations (optional, if needed)
@@ -178,6 +196,7 @@ Client receives event & updates map
 ## 📋 Files Summary
 
 ### New Files Created
+
 ```
 app/
   Events/
@@ -195,6 +214,7 @@ routes/
 ```
 
 ### Files Modified
+
 ```
 app/Http/Controllers/Api/
   ├── LocationController.php (added LocationUpdated import & broadcast)
@@ -243,7 +263,7 @@ A: Jika menggunakan self-hosted (websockets:serve), hanya server cost. Jika Push
 ## 📞 Support
 
 Untuk pertanyaan teknis lebih lanjut, refer ke:
+
 - `docs/WEBSOCKET_REALTIME_TRACKING.md` - Troubleshooting section
 - Laravel Broadcasting docs: https://laravel.com/docs/broadcasting
 - Laravel WebSockets docs: https://beyondco.de/docs/laravel-websockets/
-

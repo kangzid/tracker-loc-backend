@@ -23,7 +23,7 @@ class GpsTrackingController extends Controller
     {
         // Get token from header
         $token = $request->header('X-Tracking-Token');
-        
+
         if (!$token) {
             return response()->json([
                 'success' => false,
@@ -33,7 +33,7 @@ class GpsTrackingController extends Controller
 
         // Find vehicle by token
         $vehicle = Vehicle::where('tracking_token', $token)->first();
-        
+
         if (!$vehicle) {
             return response()->json([
                 'success' => false,
@@ -109,7 +109,7 @@ class GpsTrackingController extends Controller
     public function ping(Request $request)
     {
         $token = $request->header('X-Tracking-Token');
-        
+
         if (!$token) {
             return response()->json([
                 'success' => false,
@@ -118,7 +118,7 @@ class GpsTrackingController extends Controller
         }
 
         $vehicle = Vehicle::where('tracking_token', $token)->first();
-        
+
         if (!$vehicle) {
             return response()->json([
                 'success' => false,
@@ -148,7 +148,7 @@ class GpsTrackingController extends Controller
     public function status(Request $request)
     {
         $token = $request->header('X-Tracking-Token');
-        
+
         if (!$token) {
             return response()->json([
                 'success' => false,
@@ -159,7 +159,7 @@ class GpsTrackingController extends Controller
         $vehicle = Vehicle::where('tracking_token', $token)
             ->with('latestLocation')
             ->first();
-        
+
         if (!$vehicle) {
             return response()->json([
                 'success' => false,

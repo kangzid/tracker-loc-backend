@@ -11,10 +11,12 @@ use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\GeofenceController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\SuperadminNotificationController;
 use App\Http\Controllers\Api\ProvisionController;
 use App\Http\Controllers\Api\SuperAdminController;
 
 use App\Http\Controllers\Api\GpsTrackingController;
+use App\Http\Controllers\Api\ImageController;
 
 // ============================================================
 // Public routes
@@ -22,6 +24,9 @@ use App\Http\Controllers\Api\GpsTrackingController;
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
 Route::get('/shared-location/{token}', [LocationController::class, 'getSharedLocation']);
+
+// Public images (notifications)
+Route::get('/images/notifications/{adminId}/{date}/{filename}', [ImageController::class, 'serveNotificationImage']);
 
 // SaaS: Self-service provisioning (tanpa token — untuk client baru daftar trial)
 Route::post('/provision', [ProvisionController::class, 'provision']);
@@ -51,6 +56,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
 
+    // Admin notifications (broadcast) - for polling
+    Route::get('/admin/notifications', [NotificationController::class, 'getAdminNotifications']);
+    Route::post('/admin/notifications/{notificationId}/read', [NotificationController::class, 'markAdminNotificationAsRead']);
+    Route::delete('/admin/notifications/{notificationId}', [NotificationController::class, 'deleteAdminNotification']);
+
     // Attendance routes
     Route::get('/attendances', [AttendanceController::class, 'index']);
     Route::post('/attendances', [AttendanceController::class, 'store']);
@@ -58,7 +68,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/attendances/today', [AttendanceController::class, 'todayAttendance']);
     Route::get('/attendances/monthly', [AttendanceController::class, 'monthlyAttendance']);
     Route::get('/attendances/{id}', [AttendanceController::class, 'show']);
-    
+
     // Admin attendance management
     Route::get('/admin/attendances/employee/{employeeId}', [AttendanceController::class, 'getEmployeeAttendances']);
     Route::post('/admin/attendances', [AttendanceController::class, 'storeAdmin']); // Create attendance manually
@@ -112,18 +122,18 @@ Route::middleware('auth:sanctum')->group(function () {
         }
 
         $adminId = $request->user()->id;
-        
+
         $stats = [
             'total_employees' => \App\Models\Employee::where('admin_id', $adminId)->count(),
             'active_employees' => \App\Models\Employee::where('admin_id', $adminId)
-                ->whereHas('user', function($q) {
+                ->whereHas('user', function ($q) {
                     $q->where('is_active', true);
                 })->count(),
             'total_vehicles' => \App\Models\Vehicle::where('admin_id', $adminId)->count(),
             'active_vehicles' => \App\Models\Vehicle::where('admin_id', $adminId)
                 ->where('is_active', true)->count(),
             'today_attendances' => \App\Models\Attendance::whereDate('date', today())
-                ->whereHas('employee', function($q) use ($adminId) {
+                ->whereHas('employee', function ($q) use ($adminId) {
                     $q->where('admin_id', $adminId);
                 })->count(),
             'pending_tasks' => \App\Models\Task::where('admin_id', $adminId)
@@ -180,6 +190,12 @@ Route::middleware(['auth:sanctum', 'superadmin'])->prefix('superadmin')->group(f
     Route::put('/subscriptions/{id}', [SuperAdminController::class, 'updateSubscription']);
     Route::post('/subscriptions/{id}/extend', [SuperAdminController::class, 'extendSubscription']);
     Route::delete('/subscriptions/{id}', [SuperAdminController::class, 'cancelSubscription']);
+
+    // Broadcast notifications to admins (with image support)
+    Route::post('/notifications/broadcast', [SuperadminNotificationController::class, 'broadcast']);
+    Route::get('/notifications', [SuperadminNotificationController::class, 'index']);
+    Route::get('/notifications/{id}', [SuperadminNotificationController::class, 'show']);
+    Route::delete('/notifications/{id}', [SuperadminNotificationController::class, 'destroy']);
 });
 
 // Fallback route

@@ -28,7 +28,7 @@ class LocationChannel
                     ->exists();
             }
         }
-        
+
         // Employee hanya bisa subscribe ke location diri sendiri atau vehicle di tenant mereka
         if ($user->isEmployee()) {
             $employee = $user->employee;

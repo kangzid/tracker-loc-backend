@@ -926,6 +926,283 @@
                         }
                     },
                     "response": []
+                },
+                {
+                    "name": "Get Admin Broadcast Notifications (Polling)",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/admin/notifications?page=1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "admin",
+                                "notifications"
+                            ],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Mark Admin Notification as Read",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/admin/notifications/1/read",
+                            "variable": [
+                                {
+                                    "key": "notificationId",
+                                    "value": "1"
+                                }
+                            ],
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "admin",
+                                "notifications",
+                                "1",
+                                "read"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete Admin Notification (Soft Delete)",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/admin/notifications/1",
+                            "variable": [
+                                {
+                                    "key": "notificationId",
+                                    "value": "1"
+                                }
+                            ],
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "admin",
+                                "notifications",
+                                "1"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "🔔 SUPERADMIN - Broadcast Notification with Image",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "type",
+                                    "value": "offer",
+                                    "type": "text",
+                                    "description": "offer|news|info"
+                                },
+                                {
+                                    "key": "title",
+                                    "value": "Special Discount Offer",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "message",
+                                    "value": "Get 20% off for annual subscription renewal",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "image",
+                                    "type": "file",
+                                    "src": [],
+                                    "description": "Max 5MB, formats: jpeg, png, jpg, webp"
+                                },
+                                {
+                                    "key": "recipient_type",
+                                    "value": "all",
+                                    "type": "text",
+                                    "description": "all|specific"
+                                },
+                                {
+                                    "key": "admin_ids",
+                                    "value": "[1, 2, 3]",
+                                    "type": "text",
+                                    "description": "JSON array if recipient_type=specific"
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/superadmin/notifications/broadcast",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "superadmin",
+                                "notifications",
+                                "broadcast"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "🔔 SUPERADMIN - List Broadcast Notifications",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/superadmin/notifications?page=1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "superadmin",
+                                "notifications"
+                            ],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "🔔 SUPERADMIN - View Broadcast Notification",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/superadmin/notifications/1",
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "1"
+                                }
+                            ],
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "superadmin",
+                                "notifications",
+                                "1"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "🔔 SUPERADMIN - Delete Broadcast Notification (Hard Delete + Image)",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/superadmin/notifications/1",
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "1"
+                                }
+                            ],
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "superadmin",
+                                "notifications",
+                                "1"
+                            ]
+                        }
+                    },
+                    "response": []
                 }
             ]
         },

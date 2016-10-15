@@ -16,7 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(\App\Http\Middleware\EnsureSecurityHeaders::class);
         $middleware->alias([
             'subscription.quota' => \App\Http\Middleware\CheckSubscription::class,
-            'superadmin'         => \App\Http\Middleware\EnsureSuperAdmin::class,
+            'superadmin' => \App\Http\Middleware\EnsureSuperAdmin::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -796,6 +796,265 @@
                 }
               },
               "response": []
+            },
+            {
+              "name": "🔔 Admin - Get Broadcast Notifications (Polling)",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/admin/notifications?page=1",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "notifications"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    }
+                  ]
+                },
+                "description": "Get broadcast notifications untuk admin. Polling setiap 30 detik. Excludes soft-deleted notifications."
+              },
+              "response": []
+            },
+            {
+              "name": "🔔 Admin - Mark Notification as Read",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/admin/notifications/:notificationId/read",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "notifications",
+                    ":notificationId",
+                    "read"
+                  ],
+                  "variable": [
+                    {
+                      "key": "notificationId",
+                      "value": "1"
+                    }
+                  ]
+                },
+                "description": "Mark broadcast notification sebagai sudah dibaca."
+              },
+              "response": []
+            },
+            {
+              "name": "🔔 Admin - Delete/Hide Notification (Soft Delete)",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/admin/notifications/:notificationId",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "notifications",
+                    ":notificationId"
+                  ],
+                  "variable": [
+                    {
+                      "key": "notificationId",
+                      "value": "1"
+                    }
+                  ]
+                },
+                "description": "Soft delete (hide) notification. Hanya hilang dari view admin ini. Admin lain & superadmin masih bisa lihat."
+              },
+              "response": []
+            },
+            {
+              "name": "🔔 SUPERADMIN - Broadcast Notification with Image",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"type\": \"offer\",\n    \"title\": \"50% Off Annual Plans\",\n    \"message\": \"Limited time offer valid through end of month\",\n    \"image_url\": \"https://example.com/image.jpg\",\n    \"recipient_type\": \"specific\",\n    \"admin_ids\": [1, 3, 5]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/superadmin/notifications/broadcast",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "superadmin",
+                    "notifications",
+                    "broadcast"
+                  ]
+                },
+                "description": "Create & broadcast notification ke admin. Dikirim ke semua atau admin spesifik. Image disimpan ke storage/public/notifications.\n\nNOTE: Untuk upload image, gunakan multipart/form-data dengan field 'image' sebagai file. JSON format di atas untuk reference body structure."
+              },
+              "response": []
+            },
+            {
+              "name": "🔔 SUPERADMIN - List Broadcast Notifications",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/superadmin/notifications?page=1",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "superadmin",
+                    "notifications"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    }
+                  ]
+                },
+                "description": "List semua notifications yang dibuat oleh superadmin ini."
+              },
+              "response": []
+            },
+            {
+              "name": "🔔 SUPERADMIN - View Broadcast Notification",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/superadmin/notifications/:id",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "superadmin",
+                    "notifications",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "1"
+                    }
+                  ]
+                },
+                "description": "View detail notification dengan recipient info."
+              },
+              "response": []
+            },
+            {
+              "name": "🔔 SUPERADMIN - Delete Notification (Hard Delete + Image)",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/superadmin/notifications/:id",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "superadmin",
+                    "notifications",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "1"
+                    }
+                  ]
+                },
+                "description": "Hard delete notification: hapus record, hapus image, cascade delete admin_notification_status. Hilang untuk semua admin."
+              },
+              "response": []
             }
           ]
         },

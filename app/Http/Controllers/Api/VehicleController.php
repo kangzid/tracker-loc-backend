@@ -107,12 +107,12 @@ class VehicleController extends Controller
 
         $adminId = $request->user()->id;
         $vehicle = Vehicle::where('admin_id', $adminId)->findOrFail($id);
-        
+
         // Cascade delete: hapus semua location history yang terkait dengan vehicle ini
         Location::where('trackable_type', Vehicle::class)
             ->where('trackable_id', $id)
             ->delete();
-        
+
         // Kemudian hapus vehicle-nya
         $vehicle->delete();
 
@@ -168,7 +168,7 @@ class VehicleController extends Controller
 
         $adminId = $request->user()->id;
         $vehicle = Vehicle::where('admin_id', $adminId)->findOrFail($id);
-        
+
         // Update vehicle table
         $vehicle->update([
             'latitude' => $request->latitude,
@@ -213,7 +213,7 @@ class VehicleController extends Controller
 
         $adminId = $request->user()->id;
         $vehicle = Vehicle::where('admin_id', $adminId)->findOrFail($id);
-        
+
         $newToken = $vehicle->regenerateTrackingToken();
 
         return response()->json([
@@ -233,7 +233,7 @@ class VehicleController extends Controller
 
         $adminId = $request->user()->id;
         $vehicle = Vehicle::where('admin_id', $adminId)->findOrFail($id);
-        
+
         if (!$vehicle->tracking_token) {
             return response()->json([
                 'message' => 'No tracking token found. Generate one first.',

@@ -1,6 +1,7 @@
 # WebSocket Real-Time Tracking Implementation
 
 ## Deskripsi
+
 Sistem real-time tracking menggunakan **Laravel WebSockets** untuk efficient live location updates. Ketika employee atau vehicle mengirim location update, data langsung di-broadcast ke semua clients yang subscribed ke channel tersebut, tanpa perlu polling/refetch.
 
 ---
@@ -26,6 +27,7 @@ Real-time Map Update
 ## Setup WebSocket Server
 
 ### 1. Install Laravel WebSocket Package
+
 ```bash
 composer require beyondco/laravel-websockets
 php artisan vendor:publish --provider="BeyondCode\LaravelWebSockets\WebSocketsServiceProvider" --assets
@@ -33,6 +35,7 @@ php artisan migrate
 ```
 
 ### 2. Konfigurasi `.env`
+
 ```env
 BROADCAST_DRIVER=pusher
 PUSHER_APP_ID=1
@@ -48,6 +51,7 @@ LARAVEL_WEBSOCKETS_PORT=6001
 ```
 
 ### 3. Start WebSocket Server
+
 ```bash
 # Development
 php artisan websockets:serve
@@ -56,6 +60,7 @@ php artisan websockets:serve
 ```
 
 ### 4. Konfigurasi Channels (`config/broadcasting.php`)
+
 ```php
 'channels' => [
     'pusher' => [
@@ -79,10 +84,12 @@ php artisan websockets:serve
 ### Private Channel: `location.{trackable_type}.{trackable_id}`
 
 **Format:**
+
 - `location.employee.5` → Track employee ID 5
 - `location.vehicle.3` → Track vehicle ID 3
 
 **Authorization (app/Broadcasting/LocationChannel.php):**
+
 - **Admin**: Bisa subscribe ke location employee dan vehicle milik tenant mereka
 - **Employee**: Hanya bisa subscribe ke location diri sendiri dan vehicle di tenant mereka
 - **Guest/Invalid**: Tidak boleh subscribe
@@ -96,20 +103,22 @@ php artisan websockets:serve
 **File:** `app/Events/LocationUpdated.php`
 
 **Trigger:**
+
 - Ketika employee/vehicle submit location via `POST /api/locations`
 - Ketika admin update vehicle location via `POST /api/vehicles/{id}/location`
 
 **Payload:**
+
 ```json
 {
-  "trackable_type": "employee|vehicle",
-  "trackable_id": 5,
-  "latitude": -6.2088,
-  "longitude": 106.8456,
-  "speed": 45.5,
-  "accuracy": 10,
-  "recorded_at": "2026-04-07T10:30:00Z",
-  "entity_name": "Budi Santoso|B-1234-ABC"
+    "trackable_type": "employee|vehicle",
+    "trackable_id": 5,
+    "latitude": -6.2088,
+    "longitude": 106.8456,
+    "speed": 45.5,
+    "accuracy": 10,
+    "recorded_at": "2026-04-07T10:30:00Z",
+    "entity_name": "Budi Santoso|B-1234-ABC"
 }
 ```
 
@@ -230,6 +239,7 @@ echo.leave('location.vehicle.$vehicleId');
 ## API Endpoints (Update & Broadcast)
 
 ### Employee Submit Location (dengan Auto-Broadcast)
+
 ```
 POST /api/locations
 Content-Type: application/json
@@ -248,6 +258,7 @@ Response: Location record + WebSocket broadcast ke location.employee.5
 ```
 
 ### Admin Update Vehicle Location (dengan Auto-Broadcast)
+
 ```
 POST /api/vehicles/{id}/location
 Content-Type: application/json
@@ -268,14 +279,16 @@ Response: Vehicle record + Location record + WebSocket broadcast ke location.veh
 ## Security & Authorization
 
 ### Channel Authorization
+
 - **Private Channel**: `location.{trackable_type}.{trackable_id}`
 - Hanya authorized users yang bisa subscribe
 - Authorization check di `app/Broadcasting/LocationChannel.php`
 
 ### Database-Backed Authorization
+
 ```php
 // Admin subscribe ke employee location
-auth()->user()->isAdmin() && 
+auth()->user()->isAdmin() &&
 Employee::where('admin_id', auth()->user()->id)->where('id', $employeeId)->exists()
 
 // Employee subscribe ke diri sendiri
@@ -290,6 +303,7 @@ Vehicle::where('admin_id', $adminId)->exists()
 ## Database: Location Table
 
 **Tidak ada perubahan**, tetap menggunakan Location table yang sudah ada:
+
 ```
 locations
 ├── id (PK)
@@ -311,6 +325,7 @@ locations
 ## Performance Optimization
 
 ### 1. **Only Keep Latest Location in Live Tracking**
+
 ```php
 // LocationController@store menggunakan updateOrCreate
 // Hanya 1 record location per trackable untuk live tracking
@@ -321,19 +336,22 @@ Location::updateOrCreate(
 ```
 
 ### 2. **Batch Location Updates**
+
 Untuk high-frequency GPS updates (e.g., setiap 1 detik), bisa batch:
+
 ```javascript
 // Client side: Buffer updates, kirim setiap 5 detik
 let locationBuffer = [];
 setInterval(() => {
-  if (locationBuffer.length > 0) {
-    POST /api/locations/batch
-    locationBuffer = [];
-  }
+    if (locationBuffer.length > 0) {
+        POST / api / locations / batch;
+        locationBuffer = [];
+    }
 }, 5000);
 ```
 
 ### 3. **WebSocket vs REST API**
+
 - **WebSocket**: Real-time updates ke multiple clients (dashboard, map)
 - **REST API**: Untuk query history, detailed analytics
 - **Hybrid**: Kirim location via REST, broadcast via WebSocket
@@ -343,6 +361,7 @@ setInterval(() => {
 ## Monitoring & Debugging
 
 ### Check WebSocket Server Status
+
 ```bash
 # Terminal 1: Start WebSocket server
 php artisan websockets:serve
@@ -352,22 +371,24 @@ curl http://localhost:6001/apps/1/channels
 ```
 
 ### Client-side Debugging (Browser Console)
+
 ```javascript
 // Check connection
-window.Echo.connector.pusher.connection.state
+window.Echo.connector.pusher.connection.state;
 // Output: 'connected', 'connecting', 'disconnected'
 
 // Check subscribed channels
-Object.keys(window.Echo.connector.pusher.channels)
+Object.keys(window.Echo.connector.pusher.channels);
 // Output: ['location.employee.5', 'location.vehicle.3']
 
 // Listen to connection events
-window.Echo.connector.pusher.connection.bind('state_change', state => {
-  console.log('WebSocket state:', state);
+window.Echo.connector.pusher.connection.bind("state_change", (state) => {
+    console.log("WebSocket state:", state);
 });
 ```
 
 ### Server-side Debugging
+
 ```bash
 # Add logging di LocationUpdated event
 // app/Events/LocationUpdated.php
@@ -379,6 +400,7 @@ Log::info('Location broadcast', ['channel' => "location.{$this->trackableType}.{
 ## Production Deployment
 
 ### Option 1: Pusher (Cloud Service)
+
 ```env
 BROADCAST_DRIVER=pusher
 PUSHER_APP_ID=xxx
@@ -388,6 +410,7 @@ PUSHER_APP_CLUSTER=mt1
 ```
 
 ### Option 2: Self-Hosted WebSocket (Recommended untuk project ini)
+
 ```bash
 # Install supervisor
 sudo apt-get install supervisor
@@ -413,26 +436,28 @@ sudo supervisorctl start laravel-websockets:*
 ## Testing WebSocket
 
 ### Unit Test: Broadcasting Event
+
 ```php
 // tests/Feature/LocationTrackingTest.php
 public function test_location_update_broadcasts_to_channel()
 {
     $user = User::factory()->employee()->create();
-    
+
     Event::fake();
-    
+
     $this->actingAs($user)->postJson('/api/locations', [
         'latitude' => -6.2088,
         'longitude' => 106.8456,
         'trackable_type' => 'employee',
         'trackable_id' => $user->employee->id,
     ]);
-    
+
     Event::assertDispatched(LocationUpdated::class);
 }
 ```
 
 ### Integration Test: Subscribe & Receive
+
 ```php
 // Gunakan Pusher test mode atau WebSocket mock
 // Validate bahwa event diterima di client
@@ -442,13 +467,13 @@ public function test_location_update_broadcasts_to_channel()
 
 ## Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| WebSocket connection refused | Ensure `php artisan websockets:serve` is running on port 6001 |
-| Event not broadcasting | Check `BROADCAST_DRIVER=pusher` di .env |
-| Authorization failed | Verify user token dan location channel authorization logic |
-| Slow updates | Reduce GPS update frequency (setiap 5-10 detik vs setiap 1 detik) |
-| High server load | Batch location updates atau scale WebSocket server |
+| Issue                        | Solution                                                          |
+| ---------------------------- | ----------------------------------------------------------------- |
+| WebSocket connection refused | Ensure `php artisan websockets:serve` is running on port 6001     |
+| Event not broadcasting       | Check `BROADCAST_DRIVER=pusher` di .env                           |
+| Authorization failed         | Verify user token dan location channel authorization logic        |
+| Slow updates                 | Reduce GPS update frequency (setiap 5-10 detik vs setiap 1 detik) |
+| High server load             | Batch location updates atau scale WebSocket server                |
 
 ---
 
@@ -462,4 +487,3 @@ public function test_location_update_broadcasts_to_channel()
 ✅ **Production-ready** dengan Pusher atau self-hosted option
 
 **No polling = Lower bandwidth & Server load = Better UX**
-

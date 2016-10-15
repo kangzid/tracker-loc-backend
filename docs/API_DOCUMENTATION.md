@@ -1,12 +1,15 @@
 # LocaTrack API Documentation
 
 ## Base URL
+
 ```
 http://localhost:8000/api
 ```
 
 ## Authentication
+
 API menggunakan Laravel Sanctum untuk authentication. Setelah login, gunakan token yang diterima di header:
+
 ```
 Authorization: Bearer {your_token}
 ```
@@ -16,10 +19,13 @@ Authorization: Bearer {your_token}
 ### Authentication
 
 #### Login
+
 ```http
 POST /login
 ```
+
 **Body:**
+
 ```json
 {
     "email": "admin@locatrack.com",
@@ -28,10 +34,13 @@ POST /login
 ```
 
 #### Register
+
 ```http
 POST /register
 ```
+
 **Body:**
+
 ```json
 {
     "name": "John Doe",
@@ -47,11 +56,13 @@ POST /register
 ```
 
 #### Logout
+
 ```http
 POST /logout
 ```
 
 #### Profile
+
 ```http
 GET /profile
 ```
@@ -59,15 +70,19 @@ GET /profile
 ### Attendance (Absensi)
 
 #### Get Attendances
+
 ```http
 GET /attendances
 ```
 
 #### Check In/Out
+
 ```http
 POST /attendances
 ```
+
 **Body:**
+
 ```json
 {
     "latitude": -6.2088,
@@ -77,12 +92,15 @@ POST /attendances
 ```
 
 #### Today Attendance
+
 ```http
 GET /attendances/today
 ```
 
 #### Admin - Create Attendance (Manual/Gap-Fill)
+
 **Purpose:** Allow admin to manually create attendance records when:
+
 - Employee forgot to check-in
 - Need to fill attendance gaps
 - Manual corrections before system check-in
@@ -92,6 +110,7 @@ POST /admin/attendances
 ```
 
 **Body:**
+
 ```json
 {
     "employee_id": 2,
@@ -104,18 +123,21 @@ POST /admin/attendances
 ```
 
 **Required Fields:**
+
 - `employee_id` (integer): Must belong to admin's tenant
 - `date` (string, format: Y-m-d): Date of attendance
 - `status` (string): One of `present`, `late`, `absent`, `sick`, `leave`
 
 **Optional Fields:**
+
 - `check_in` (string, format: H:i): Check-in time
-- `check_out` (string, format: H:i): Check-out time  
+- `check_out` (string, format: H:i): Check-out time
 - `notes` (string, max 255 chars): Documentation/reason
 
 **Responses:**
 
 Success (201 Created):
+
 ```json
 {
     "message": "Attendance record created successfully",
@@ -139,6 +161,7 @@ Success (201 Created):
 ```
 
 Duplicate Record (409 Conflict):
+
 ```json
 {
     "message": "Attendance record already exists for this date",
@@ -149,6 +172,7 @@ Duplicate Record (409 Conflict):
 ```
 
 Employee Not Found (404 Not Found):
+
 ```json
 {
     "message": "Employee not found or does not belong to your tenant"
@@ -156,6 +180,7 @@ Employee Not Found (404 Not Found):
 ```
 
 Validation Error (422 Unprocessable Entity):
+
 ```json
 {
     "errors": {
@@ -166,21 +191,25 @@ Validation Error (422 Unprocessable Entity):
 ```
 
 #### Admin - Get Employee Attendances
+
 ```http
 GET /admin/attendances/employee/{employeeId}
 ```
 
 **Query Parameters:**
+
 - `date` (optional): Filter by specific date (format: Y-m-d)
 - `year` (optional): Filter by year
 - `month` (optional): Filter by month
 
 #### Admin - Update Attendance
+
 ```http
 PUT /admin/attendances/{attendanceId}
 ```
 
 **Body:**
+
 ```json
 {
     "status": "present",
@@ -190,7 +219,8 @@ PUT /admin/attendances/{attendanceId}
 }
 ```
 
-#### Admin - Delete Attendance  
+#### Admin - Delete Attendance
+
 ```http
 DELETE /admin/attendances/{attendanceId}
 ```
@@ -200,10 +230,13 @@ DELETE /admin/attendances/{attendanceId}
 ### Location Tracking
 
 #### Store Location
+
 ```http
 POST /locations
 ```
+
 **Body:**
+
 ```json
 {
     "latitude": -6.2088,
@@ -216,25 +249,31 @@ POST /locations
 ```
 
 #### Live Tracking
+
 ```http
 GET /locations/live
 ```
 
 #### Employee Location History
+
 ```http
 GET /locations/employee/{employeeId}/history?date=2024-01-01
 ```
 
 #### Vehicle Location History
+
 ```http
 GET /locations/vehicle/{vehicleId}/history?start_date=2024-01-01&end_date=2024-01-31
 ```
 
 #### Share Location
+
 ```http
 POST /locations/share
 ```
+
 **Body:**
+
 ```json
 {
     "latitude": -6.2088,
@@ -246,22 +285,26 @@ POST /locations/share
 ### Tasks
 
 #### Get Tasks
+
 ```http
 GET /tasks
 ```
 
 #### Create Task (Admin only)
+
 ```http
 POST /tasks
 ```
+
 **Body:**
+
 ```json
 {
     "title": "Survey Lokasi Proyek",
     "description": "Melakukan survey lokasi untuk proyek baru",
     "assigned_to": 1,
     "latitude": -6.1751,
-    "longitude": 106.8650,
+    "longitude": 106.865,
     "address": "Jl. Sudirman No. 123",
     "priority": "high",
     "due_date": "2024-12-31 17:00:00"
@@ -269,30 +312,37 @@ POST /tasks
 ```
 
 #### Update Task
+
 ```http
 PUT /tasks/{id}
 ```
 
 #### Delete Task (Admin only)
+
 ```http
 DELETE /tasks/{id}
 ```
 
 #### My Tasks
+
 ```http
 GET /my-tasks?status=pending&priority=high
 ```
 
 #### Start Task
+
 ```http
 POST /tasks/{id}/start
 ```
 
 #### Complete Task
+
 ```http
 POST /tasks/{id}/complete
 ```
+
 **Body:**
+
 ```json
 {
     "completion_notes": "Task completed successfully"
@@ -302,15 +352,19 @@ POST /tasks/{id}/complete
 ### Vehicles (Admin only)
 
 #### Get Vehicles
+
 ```http
 GET /vehicles
 ```
 
 #### Create Vehicle
+
 ```http
 POST /vehicles
 ```
+
 **Body:**
+
 ```json
 {
     "vehicle_number": "B 9999 XYZ",
@@ -322,25 +376,31 @@ POST /vehicles
 ```
 
 #### Update Vehicle
+
 ```http
 PUT /vehicles/{id}
 ```
 
 #### Delete Vehicle
+
 ```http
 DELETE /vehicles/{id}
 ```
 
 #### Active Vehicles
+
 ```http
 GET /vehicles-active
 ```
 
 #### Update Vehicle Location
+
 ```http
 POST /vehicles/{id}/location
 ```
+
 **Body:**
+
 ```json
 {
     "latitude": -6.2088,
@@ -351,11 +411,13 @@ POST /vehicles/{id}/location
 ### Dashboard
 
 #### Admin Dashboard Stats
+
 ```http
 GET /dashboard/stats
 ```
 
 #### Employee Dashboard
+
 ```http
 GET /employee/dashboard
 ```
@@ -363,15 +425,18 @@ GET /employee/dashboard
 ## Default Users
 
 ### Admin
+
 - Email: admin@locatrack.com
 - Password: password123
 
 ### Employee 1
+
 - Email: john@locatrack.com
 - Password: password123
 - Employee ID: EMP001
 
 ### Employee 2
+
 - Email: jane@locatrack.com
 - Password: password123
 - Employee ID: EMP002
@@ -388,6 +453,7 @@ GET /employee/dashboard
 - 500: Server Error
 
 ## Error Response Format
+
 ```json
 {
     "message": "Error message",
