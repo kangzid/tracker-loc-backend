@@ -1,0 +1,142 @@
+├── src/
+│   ├── lib/
+│   │   ├── assets/
+│   │   │   └── favicon.svg (1.5 KB)
+│   │   ├── components/
+│   │   │   ├── features/
+│   │   │   │   ├── dashboard/
+│   │   │   │   │   ├── attendance-card.svelte (2.7 KB)
+│   │   │   │   │   ├── fleet-status-card.svelte (2.2 KB)
+│   │   │   │   │   └── quick-actions-card.svelte (2.1 KB)
+│   │   │   │   ├── employees/
+│   │   │   │   │   └── employee-form.svelte (3.1 KB)
+│   │   │   │   ├── tasks/
+│   │   │   │   │   └── task-form.svelte (3.9 KB)
+│   │   │   │   ├── users/
+│   │   │   │   │   └── user-form.svelte (2.5 KB)
+│   │   │   │   └── vehicles/
+│   │   │   │       └── vehicle-form.svelte (2.1 KB)
+│   │   │   ├── map/
+│   │   │   │   └── leaflet-map.svelte (11.1 KB)
+│   │   │   └── ui/
+│   │   │       ├── button/
+│   │   │       │   └── button.svelte (1.8 KB)
+│   │   │       ├── card/
+│   │   │       │   ├── card-content.svelte (0.4 KB)
+│   │   │       │   ├── card-footer.svelte (0.4 KB)
+│   │   │       │   ├── card-header.svelte (0.4 KB)
+│   │   │       │   ├── card-title.svelte (0.4 KB)
+│   │   │       │   └── card.svelte (0.5 KB)
+│   │   │       ├── dialog/
+│   │   │       │   ├── dialog-content.svelte (1.7 KB)
+│   │   │       │   ├── dialog-description.svelte (0.4 KB)
+│   │   │       │   ├── dialog-footer.svelte (0.5 KB)
+│   │   │       │   ├── dialog-header.svelte (0.4 KB)
+│   │   │       │   ├── dialog-title.svelte (0.4 KB)
+│   │   │       │   ├── dialog-trigger.svelte (0.8 KB)
+│   │   │       │   ├── dialog.svelte (0.4 KB)
+│   │   │       │   └── index.ts (0.6 KB)
+│   │   │       ├── input/
+│   │   │       │   └── input.svelte (0.8 KB)
+│   │   │       ├── label/
+│   │   │       │   └── label.svelte (0.5 KB)
+│   │   │       ├── mode-toggle/
+│   │   │       │   └── mode-toggle.svelte (1.1 KB)
+│   │   │       ├── table/
+│   │   │       │   ├── index.ts (0.6 KB)
+│   │   │       │   ├── table-body.svelte (0.4 KB)
+│   │   │       │   ├── table-caption.svelte (0.4 KB)
+│   │   │       │   ├── table-cell.svelte (0.4 KB)
+│   │   │       │   ├── table-head.svelte (0.5 KB)
+│   │   │       │   ├── table-header.svelte (0.4 KB)
+│   │   │       │   ├── table-row.svelte (0.5 KB)
+│   │   │       │   └── table.svelte (0.5 KB)
+│   │   │       └── textarea/
+│   │   │           └── textarea.svelte (0.7 KB)
+│   │   ├── services/
+│   │   │   ├── api.service.ts (1.8 KB)
+│   │   │   ├── attendance.service.ts (3.0 KB)
+│   │   │   ├── auth.service.ts (1.4 KB)
+│   │   │   ├── dashboard.service.ts (1.2 KB)
+│   │   │   ├── employee.service.ts (2.8 KB)
+│   │   │   ├── geofence.service.ts (3.1 KB)
+│   │   │   ├── location.service.ts (4.0 KB)
+│   │   │   ├── notification.service.ts (2.5 KB)
+│   │   │   ├── task.service.ts (2.9 KB)
+│   │   │   ├── user.service.ts (2.7 KB)
+│   │   │   └── vehicle.service.ts (3.1 KB)
+│   │   ├── stores/
+│   │   │   └── notification.store.ts (0.8 KB)
+│   │   ├── types/
+│   │   │   ├── attendance.ts (1.0 KB)
+│   │   │   ├── auth.ts (0.9 KB)
+│   │   │   ├── dashboard.ts (0.4 KB)
+│   │   │   ├── geofence.ts (0.7 KB)
+│   │   │   ├── location.ts (1.5 KB)
+│   │   │   ├── notification.ts (0.3 KB)
+│   │   │   └── task.ts (0.5 KB)
+│   │   ├── utils/
+│   │   │   └── cn.ts (0.2 KB)
+│   │   └── index.ts (0.1 KB)
+│   ├── routes/
+│   │   ├── admin/
+│   │   │   ├── attendances/
+│   │   │   │   ├── +page.server.ts (0.7 KB)
+│   │   │   │   └── +page.svelte (17.0 KB)
+│   │   │   ├── dashboard/
+│   │   │   │   ├── +page.server.ts (0.6 KB)
+│   │   │   │   └── +page.svelte (4.3 KB)
+│   │   │   ├── employees/
+│   │   │   │   ├── +page.server.ts (3.0 KB)
+│   │   │   │   └── +page.svelte (10.6 KB)
+│   │   │   ├── geofences/
+│   │   │   │   ├── +page.server.ts (0.7 KB)
+│   │   │   │   └── +page.svelte (15.7 KB)
+│   │   │   ├── monitoring/
+│   │   │   │   ├── +page.server.ts (0.7 KB)
+│   │   │   │   └── +page.svelte (8.9 KB)
+│   │   │   ├── notifications/
+│   │   │   │   ├── +page.server.ts (1.4 KB)
+│   │   │   │   └── +page.svelte (4.2 KB)
+│   │   │   ├── settings/
+│   │   │   │   ├── +page.server.ts (3.1 KB)
+│   │   │   │   └── +page.svelte (16.7 KB)
+│   │   │   ├── tasks/
+│   │   │   │   ├── +page.server.ts (2.8 KB)
+│   │   │   │   └── +page.svelte (11.9 KB)
+│   │   │   ├── users/
+│   │   │   │   ├── +page.server.ts (1.9 KB)
+│   │   │   │   └── +page.svelte (9.0 KB)
+│   │   │   ├── vehicles/
+│   │   │   │   ├── +page.server.ts (0.7 KB)
+│   │   │   │   └── +page.svelte (11.0 KB)
+│   │   │   ├── +layout.server.ts (0.6 KB)
+│   │   │   └── +layout.svelte (13.4 KB)
+│   │   ├── employee/
+│   │   │   ├── dashboard/
+│   │   │   │   ├── +page.server.ts (1.2 KB)
+│   │   │   │   └── +page.svelte (8.7 KB)
+│   │   │   ├── +layout.server.ts (0.9 KB)
+│   │   │   └── +layout.svelte (12.9 KB)
+│   │   ├── login/
+│   │   │   ├── +page.server.ts (1.9 KB)
+│   │   │   └── +page.svelte (5.7 KB)
+│   │   ├── logout/
+│   │   │   └── +page.server.ts (0.3 KB)
+│   │   ├── +layout.svelte (0.2 KB)
+│   │   ├── +page.server.ts (0.3 KB)
+│   │   ├── +page.svelte (0.1 KB)
+│   │   └── layout.css (0.1 KB)
+│   ├── app.css (2.7 KB)
+│   ├── app.d.ts (0.3 KB)
+│   └── app.html (0.8 KB)
+├── static/
+│   └── robots.txt (0.1 KB)
+├── package-lock.json (65.3 KB)
+├── package.json (0.9 KB)
+├── README.md (0.8 KB)
+├── svelte.config.js (0.6 KB)
+├── testing_postman_collection.json (88.3 KB)
+├── testing-api.txt (27.1 KB)
+├── tsconfig.json (0.7 KB)
+└── vite.config.ts (0.2 KB)
