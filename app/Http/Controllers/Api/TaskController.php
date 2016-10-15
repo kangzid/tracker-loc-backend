@@ -202,6 +202,8 @@ class TaskController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'completion_notes' => 'nullable|string',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
         ]);
 
         if ($validator->fails()) {
@@ -219,11 +221,18 @@ class TaskController extends Controller
             return response()->json(['message' => 'Task already completed'], 400);
         }
 
-        $task->update([
+        $updateData = [
             'status' => 'completed',
             'completed_at' => now(),
             'completion_notes' => $request->completion_notes,
-        ]);
+        ];
+
+        if ($request->has('latitude') && $request->has('longitude')) {
+            $updateData['latitude'] = $request->latitude;
+            $updateData['longitude'] = $request->longitude;
+        }
+
+        $task->update($updateData);
 
         return response()->json($task);
     }

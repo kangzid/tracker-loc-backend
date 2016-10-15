@@ -410,6 +410,119 @@
           "name": "Tasks",
           "item": [
             {
+              "name": "Get My Tasks (All)",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/my-tasks",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "my-tasks"
+                  ]
+                },
+                "description": "Mengambil semua tugas (tasks) yang ditugaskan kepada saya (employee) dengan pagination."
+              },
+              "response": []
+            },
+            {
+              "name": "Filter Tasks by Priority",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/my-tasks?priority=urgent",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "my-tasks"
+                  ],
+                  "query": [
+                    {
+                      "key": "priority",
+                      "value": "urgent",
+                      "description": "low, medium, high, atau urgent"
+                    }
+                  ]
+                },
+                "description": "Mengambil semua tugas berdasarkan prioritas."
+              },
+              "response": []
+            },
+            {
+              "name": "Get Task Detail by ID",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/tasks/:id",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tasks",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "1"
+                    }
+                  ]
+                },
+                "description": "Melihat detail lengkap satu tugas tertentu menggunakan ID-nya."
+              },
+              "response": []
+            },
+            {
               "name": "Get My Tasks",
               "request": {
                 "auth": {
@@ -533,7 +646,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\"completion_notes\": \"Task completed successfully.\"}",
+                  "raw": "{\n    \"completion_notes\": \"Task completed successfully.\",\n    \"latitude\": -6.21462,\n    \"longitude\": 106.84513\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -556,7 +669,8 @@
                       "value": "1"
                     }
                   ]
-                }
+                },
+                "description": "Menyelesaikan task. Dapat menyertakan 'completion_notes' opsional dan 'latitude', 'longitude' jika karyawan perlu mencatat koordinat saat menyelesaikan tugasnya."
               },
               "response": []
             }
