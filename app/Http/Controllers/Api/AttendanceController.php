@@ -53,13 +53,7 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'Employee profile not found'], 404);
         }
 
-        $today = Carbon::today();
-        $attendance = Attendance::firstOrCreate(
-            ['employee_id' => $employee->id, 'date' => $today],
-            ['status' => 'present']
-        );
-
-        // Check geofencing
+        // Check geofencing first BEFORE creating any record in the database
         $isInOffice = $this->checkGeofencing($request->latitude, $request->longitude);
         
         // Return error if outside office area
@@ -70,6 +64,12 @@ class AttendanceController extends Controller
                 'title' => 'Lokasi Tidak Valid'
             ], 422);
         }
+
+        $today = Carbon::today();
+        $attendance = Attendance::firstOrCreate(
+            ['employee_id' => $employee->id, 'date' => $today],
+            ['status' => 'present']
+        );
 
         if ($request->type === 'check_in') {
             if ($attendance->check_in) {
