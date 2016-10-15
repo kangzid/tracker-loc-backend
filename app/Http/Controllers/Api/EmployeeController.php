@@ -105,6 +105,7 @@ class EmployeeController extends Controller
         $request->validate([
             'name' => 'sometimes|string|max:255',
             'email' => 'sometimes|email|unique:users,email,' . $employee->user_id,
+            'password' => 'sometimes|string|min:8',
             'employee_id' => 'sometimes|unique:employees,employee_id,' . $id,
             'phone' => 'nullable|string',
             'address' => 'nullable|string',
@@ -113,11 +114,18 @@ class EmployeeController extends Controller
         ]);
 
         // Update user data if provided
-        if ($request->has('name') || $request->has('email')) {
-            $employee->user->update(array_filter([
+        if ($request->has('name') || $request->has('email') || $request->has('password')) {
+            $userData = array_filter([
                 'name' => $request->name,
                 'email' => $request->email,
-            ]));
+            ]);
+            
+            // Allow admin to force update password if provided
+            if ($request->has('password')) {
+                $userData['password'] = Hash::make($request->password);
+            }
+
+            $employee->user->update($userData);
         }
 
         // Update employee data

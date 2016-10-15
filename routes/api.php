@@ -11,17 +11,30 @@ use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\GeofenceController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\ProvisionController;
+use App\Http\Controllers\Api\SuperAdminController;
 
+// ============================================================
 // Public routes
+// ============================================================
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
 Route::get('/shared-location/{token}', [LocationController::class, 'getSharedLocation']);
 
+// SaaS: Self-service provisioning (tanpa token — untuk client baru daftar trial)
+Route::post('/provision', [ProvisionController::class, 'provision']);
+
+// ============================================================
 // Protected routes
+// ============================================================
 Route::middleware('auth:sanctum')->group(function () {
     // Auth routes
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/profile', [AuthController::class, 'profile']);
+    Route::put('/change-password', [AuthController::class, 'changePassword']);
+
+    // SaaS: Status subscription milik admin yang sedang login
+    Route::get('/subscription/status', [ProvisionController::class, 'status']);
 
     // Notification routes
     Route::get('/notifications', [NotificationController::class, 'index']);
@@ -68,10 +81,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/users/{id}', [UserController::class, 'destroy']);
 
     // Employee routes (Admin only)
-    Route::apiResource('employees', EmployeeController::class);
+    // middleware subscription.quota:employee → cek kuota sebelum tambah karyawan baru
+    Route::post('/employees', [EmployeeController::class, 'store'])->middleware('subscription.quota:employee');
+    Route::apiResource('employees', EmployeeController::class)->except('store');
 
     // Vehicle routes (Admin only)
-    Route::apiResource('vehicles', VehicleController::class);
+    // middleware subscription.quota:vehicle → cek kuota sebelum tambah kendaraan baru
+    Route::post('/vehicles', [VehicleController::class, 'store'])->middleware('subscription.quota:vehicle');
+    Route::apiResource('vehicles', VehicleController::class)->except('store');
     Route::get('/vehicles-active', [VehicleController::class, 'activeVehicles']);
     Route::get('/vehicles-inactive', [VehicleController::class, 'inactiveVehicles']);
     Route::post('/vehicles/{id}/location', [VehicleController::class, 'updateLocation']);
@@ -117,6 +134,29 @@ Route::middleware('auth:sanctum')->group(function () {
 
         return response()->json($stats);
     });
+});
+
+// ============================================================
+// Superadmin routes — hanya untuk pemilik layanan
+// ============================================================
+Route::middleware(['auth:sanctum', 'superadmin'])->prefix('superadmin')->group(function () {
+
+    // Dashboard & statistik platform
+    Route::get('/dashboard', [SuperAdminController::class, 'dashboard']);
+
+    // Manajemen Akun Admin (Tenant)
+    Route::get('/admins', [SuperAdminController::class, 'listAdmins']);
+    Route::post('/admins', [SuperAdminController::class, 'createAdmin']);
+    Route::get('/admins/{id}', [SuperAdminController::class, 'showAdmin']);
+    Route::put('/admins/{id}/toggle', [SuperAdminController::class, 'toggleAdmin']);
+    Route::put('/admins/{id}/reset-password', [SuperAdminController::class, 'resetAdminPassword']);
+    Route::delete('/admins/{id}', [SuperAdminController::class, 'deleteAdmin']);
+
+    // Manajemen Subscription
+    Route::get('/subscriptions', [SuperAdminController::class, 'listSubscriptions']);
+    Route::put('/subscriptions/{id}', [SuperAdminController::class, 'updateSubscription']);
+    Route::post('/subscriptions/{id}/extend', [SuperAdminController::class, 'extendSubscription']);
+    Route::delete('/subscriptions/{id}', [SuperAdminController::class, 'cancelSubscription']);
 });
 
 // Fallback route

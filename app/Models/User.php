@@ -38,18 +38,28 @@ class User extends Authenticatable
         return $this->hasOne(Employee::class);
     }
 
+    public function subscription()
+    {
+        return $this->hasOne(Subscription::class)->latest();
+    }
+
     public function assignedTasks()
     {
         return $this->hasMany(Task::class, 'assigned_by');
     }
 
-    public function isAdmin()
+    public function isAdmin(): bool
     {
         return $this->role === 'admin';
     }
 
-    public function isEmployee()
+    public function isEmployee(): bool
     {
         return $this->role === 'employee';
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === 'superadmin';
     }
 }
