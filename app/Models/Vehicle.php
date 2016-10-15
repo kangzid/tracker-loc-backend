@@ -20,6 +20,8 @@ class Vehicle extends Model
         'longitude',
         'last_location_update',
         'is_active',
+        'tracking_token',
+        'token_generated_at',
     ];
 
     protected function casts(): array
@@ -29,6 +31,7 @@ class Vehicle extends Model
             'longitude' => 'decimal:8',
             'last_location_update' => 'datetime',
             'is_active' => 'boolean',
+            'token_generated_at' => 'datetime',
         ];
     }
 
@@ -45,5 +48,26 @@ class Vehicle extends Model
     public function admin()
     {
         return $this->belongsTo(User::class, 'admin_id');
+    }
+
+    /**
+     * Generate unique tracking token for GPS device
+     */
+    public function generateTrackingToken(): string
+    {
+        $token = bin2hex(random_bytes(32)); // 64 character token
+        $this->update([
+            'tracking_token' => $token,
+            'token_generated_at' => now(),
+        ]);
+        return $token;
+    }
+
+    /**
+     * Regenerate tracking token (revoke old token)
+     */
+    public function regenerateTrackingToken(): string
+    {
+        return $this->generateTrackingToken();
     }
 }

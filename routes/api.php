@@ -14,6 +14,8 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProvisionController;
 use App\Http\Controllers\Api\SuperAdminController;
 
+use App\Http\Controllers\Api\GpsTrackingController;
+
 // ============================================================
 // Public routes
 // ============================================================
@@ -23,6 +25,13 @@ Route::get('/shared-location/{token}', [LocationController::class, 'getSharedLoc
 
 // SaaS: Self-service provisioning (tanpa token — untuk client baru daftar trial)
 Route::post('/provision', [ProvisionController::class, 'provision']);
+
+// GPS Tracking: Public endpoints untuk GPS device (pakai tracking token)
+Route::prefix('gps')->group(function () {
+    Route::post('/track', [GpsTrackingController::class, 'track']);
+    Route::get('/ping', [GpsTrackingController::class, 'ping']);
+    Route::get('/status', [GpsTrackingController::class, 'status']);
+});
 
 // ============================================================
 // Protected routes
@@ -92,6 +101,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/vehicles-active', [VehicleController::class, 'activeVehicles']);
     Route::get('/vehicles-inactive', [VehicleController::class, 'inactiveVehicles']);
     Route::post('/vehicles/{id}/location', [VehicleController::class, 'updateLocation']);
+    Route::post('/vehicles/{id}/regenerate-token', [VehicleController::class, 'regenerateToken']);
+    Route::get('/vehicles/{id}/token', [VehicleController::class, 'getToken']);
 
     // Dashboard/Analytics routes
     Route::get('/dashboard/stats', function (Request $request) {

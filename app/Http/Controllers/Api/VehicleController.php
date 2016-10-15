@@ -48,7 +48,14 @@ class VehicleController extends Controller
             ['admin_id' => $request->user()->id]
         ));
 
-        return response()->json($vehicle, 201);
+        // Generate tracking token automatically
+        $token = $vehicle->generateTrackingToken();
+
+        return response()->json([
+            'vehicle' => $vehicle,
+            'tracking_token' => $token,
+            'message' => 'Vehicle created successfully. Save this tracking token for your GPS device.'
+        ], 201);
     }
 
     public function show(Request $request, $id)
@@ -175,6 +182,50 @@ class VehicleController extends Controller
         return response()->json([
             'vehicle' => $vehicle,
             'location' => $location
+        ]);
+    }
+
+    public function regenerateToken(Request $request, $id)
+    {
+        if (!$request->user()->isAdmin()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $adminId = $request->user()->id;
+        $vehicle = Vehicle::where('admin_id', $adminId)->findOrFail($id);
+        
+        $newToken = $vehicle->regenerateTrackingToken();
+
+        return response()->json([
+            'message' => 'Tracking token regenerated successfully. Update your GPS device with new token.',
+            'vehicle_id' => $vehicle->id,
+            'vehicle_number' => $vehicle->vehicle_number,
+            'tracking_token' => $newToken,
+            'generated_at' => $vehicle->token_generated_at,
+        ]);
+    }
+
+    public function getToken(Request $request, $id)
+    {
+        if (!$request->user()->isAdmin()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $adminId = $request->user()->id;
+        $vehicle = Vehicle::where('admin_id', $adminId)->findOrFail($id);
+        
+        if (!$vehicle->tracking_token) {
+            return response()->json([
+                'message' => 'No tracking token found. Generate one first.',
+                'vehicle_id' => $vehicle->id,
+            ], 404);
+        }
+
+        return response()->json([
+            'vehicle_id' => $vehicle->id,
+            'vehicle_number' => $vehicle->vehicle_number,
+            'tracking_token' => $vehicle->tracking_token,
+            'generated_at' => $vehicle->token_generated_at,
         ]);
     }
 }
