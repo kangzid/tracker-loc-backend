@@ -1719,7 +1719,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\"license_plate\": \"B 1234 CD\", \"brand\": \"Toyota\", \"model\": \"Avanza\", \"year\": 2020}",
+                  "raw": "{\n    \"brand\": \"Toyota\",\n    \"model\": \"Avanza\",\n    \"year\": 2020,\n    \"vehicle_number\": \"B 1234 CD\",\n    \"vehicle_type\": \"Mobil\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -1894,7 +1894,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\"name\": \"Office\", \"latitude\": -6.2, \"longitude\": 106.8, \"radius\": 100}",
+                  "raw": "{\n    \"name\": \"Office\",\n    \"radius\": 100,\n    \"center_lat\": -6.2,\n    \"center_lng\": 106.8,\n    \"type\": \"office\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -1930,7 +1930,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\"name\": \"Kantor Cabang\", \"center_lat\": -6.300000, \"center_lng\": 106.900000, \"radius\": 150, \"type\": \"office\"}",
+                  "raw": "{\n    \"name\": \"Kantor Cabang\",\n    \"center_lat\": -6.3,\n    \"center_lng\": 106.9,\n    \"radius\": 150,\n    \"type\": \"office\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"

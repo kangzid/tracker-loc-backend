@@ -289,6 +289,7 @@ class AttendanceController extends Controller
             ->get();
 
         foreach ($geofences as $geofence) {
+            /** @var \App\Models\Geofence $geofence */
             if ($geofence->isInsideGeofence($latitude, $longitude)) {
                 return true;
             }
