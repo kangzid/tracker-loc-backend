@@ -61,6 +61,15 @@ class AttendanceController extends Controller
 
         // Check geofencing
         $isInOffice = $this->checkGeofencing($request->latitude, $request->longitude);
+        
+        // Return error if outside office area
+        if (!$isInOffice) {
+            return response()->json([
+                'error' => 'OUTSIDE_GEOFENCE',
+                'message' => 'Anda berada di luar area kantor. Silakan mendekat ke area kantor untuk melakukan absensi.',
+                'title' => 'Lokasi Tidak Valid'
+            ], 422);
+        }
 
         if ($request->type === 'check_in') {
             if ($attendance->check_in) {
@@ -239,6 +248,25 @@ class AttendanceController extends Controller
         $attendance->delete();
 
         return response()->json(['message' => 'Attendance deleted successfully']);
+    }
+
+    public function checkLocation(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'latitude' => 'required|numeric',
+            'longitude' => 'required|numeric',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $isInOffice = $this->checkGeofencing($request->latitude, $request->longitude);
+        
+        return response()->json([
+            'is_in_office' => $isInOffice,
+            'message' => $isInOffice ? 'Anda berada di area kantor' : 'Anda berada di luar area kantor'
+        ]);
     }
 
     public function cleanupOldAttendances()

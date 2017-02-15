@@ -37,15 +37,20 @@ class LocationController extends Controller
             $trackable = Vehicle::findOrFail($request->trackable_id);
         }
 
-        $location = Location::create([
-            'trackable_type' => $request->trackable_type === 'employee' ? Employee::class : Vehicle::class,
-            'trackable_id' => $request->trackable_id,
-            'latitude' => $request->latitude,
-            'longitude' => $request->longitude,
-            'speed' => $request->speed,
-            'accuracy' => $request->accuracy,
-            'recorded_at' => now(),
-        ]);
+        // Update or create latest location (only keep one record per trackable)
+        $location = Location::updateOrCreate(
+            [
+                'trackable_type' => $request->trackable_type === 'employee' ? Employee::class : Vehicle::class,
+                'trackable_id' => $request->trackable_id,
+            ],
+            [
+                'latitude' => $request->latitude,
+                'longitude' => $request->longitude,
+                'speed' => $request->speed,
+                'accuracy' => $request->accuracy,
+                'recorded_at' => now(),
+            ]
+        );
 
         // Update last location in trackable model
         $trackable->update([

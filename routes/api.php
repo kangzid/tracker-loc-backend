@@ -25,6 +25,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Attendance routes
     Route::get('/attendances', [AttendanceController::class, 'index']);
     Route::post('/attendances', [AttendanceController::class, 'store']);
+    Route::post('/attendances/check-location', [AttendanceController::class, 'checkLocation']);
     Route::get('/attendances/today', [AttendanceController::class, 'todayAttendance']);
     Route::get('/attendances/monthly', [AttendanceController::class, 'monthlyAttendance']);
     Route::get('/attendances/{id}', [AttendanceController::class, 'show']);
