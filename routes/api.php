@@ -28,6 +28,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/attendances/today', [AttendanceController::class, 'todayAttendance']);
     Route::get('/attendances/monthly', [AttendanceController::class, 'monthlyAttendance']);
     Route::get('/attendances/{id}', [AttendanceController::class, 'show']);
+    
+    // Admin attendance management
+    Route::get('/admin/attendances/employee/{employeeId}', [AttendanceController::class, 'getEmployeeAttendances']);
+    Route::put('/admin/attendances/{id}', [AttendanceController::class, 'update']);
+    Route::delete('/admin/attendances/{id}', [AttendanceController::class, 'destroy']);
+    Route::post('/admin/attendances/cleanup', [AttendanceController::class, 'cleanupOldAttendances']);
 
     // Location tracking routes
     Route::post('/locations', [LocationController::class, 'store']);

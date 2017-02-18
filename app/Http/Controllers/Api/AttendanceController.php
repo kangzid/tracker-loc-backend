@@ -8,6 +8,7 @@ use App\Models\Geofence;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class AttendanceController extends Controller
 {
@@ -127,6 +128,130 @@ class AttendanceController extends Controller
             ->get();
 
         return response()->json($attendances);
+    }
+
+    // Admin only methods
+    public function getEmployeeAttendances(Request $request, $employeeId)
+    {
+        if (!$request->user()->isAdmin()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'month' => 'nullable|integer|between:1,12',
+            'year' => 'nullable|integer|min:2020',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $month = $request->month ?? Carbon::now()->month;
+        $year = $request->year ?? Carbon::now()->year;
+        
+        // Get all days in the month
+        $daysInMonth = Carbon::create($year, $month)->daysInMonth;
+        $startDate = Carbon::create($year, $month, 1);
+        $endDate = Carbon::create($year, $month, $daysInMonth);
+
+        $attendances = Attendance::with('employee.user')
+            ->where('employee_id', $employeeId)
+            ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+            ->orderBy('date', 'asc')
+            ->get();
+
+        // Create array with all days of the month
+        $result = [];
+        for ($day = 1; $day <= $daysInMonth; $day++) {
+            $date = Carbon::create($year, $month, $day)->format('Y-m-d');
+            $attendance = $attendances->firstWhere('date', $date);
+            
+            $result[] = [
+                'date' => $date,
+                'day_name' => Carbon::create($year, $month, $day)->format('l'),
+                'attendance' => $attendance,
+            ];
+        }
+
+        return response()->json([
+            'month' => $month,
+            'year' => $year,
+            'days_in_month' => $daysInMonth,
+            'attendances' => $result
+        ]);
+    }
+
+    public function update(Request $request, $id)
+    {
+        if (!$request->user()->isAdmin()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $attendance = Attendance::findOrFail($id);
+        
+        // Only allow edit within 7 days
+        if (Carbon::parse($attendance->date)->diffInDays(Carbon::now()) > 7) {
+            return response()->json(['message' => 'Can only edit attendance within 7 days'], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'check_in' => 'nullable|date_format:H:i',
+            'check_out' => 'nullable|date_format:H:i',
+            'status' => 'required|in:present,late,absent,sick,leave',
+            'notes' => 'nullable|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+        
+        $updateData = [
+            'status' => $request->status,
+            'notes' => $request->notes,
+        ];
+
+        if ($request->check_in) {
+            $updateData['check_in'] = Carbon::parse($attendance->date . ' ' . $request->check_in);
+        }
+
+        if ($request->check_out) {
+            $updateData['check_out'] = Carbon::parse($attendance->date . ' ' . $request->check_out);
+        }
+
+        $attendance->update($updateData);
+
+        return response()->json($attendance->load('employee.user'));
+    }
+
+    public function destroy(Request $request, $id)
+    {
+        if (!$request->user()->isAdmin()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $attendance = Attendance::findOrFail($id);
+        
+        // Only allow delete within 7 days
+        if (Carbon::parse($attendance->date)->diffInDays(Carbon::now()) > 7) {
+            return response()->json(['message' => 'Can only delete attendance within 7 days'], 403);
+        }
+
+        $attendance->delete();
+
+        return response()->json(['message' => 'Attendance deleted successfully']);
+    }
+
+    public function cleanupOldAttendances()
+    {
+        // Delete attendances older than 3 months
+        $threeMonthsAgo = Carbon::now()->subMonths(3);
+        
+        $deletedCount = Attendance::where('date', '<', $threeMonthsAgo->format('Y-m-d'))->delete();
+        
+        return response()->json([
+            'message' => 'Old attendances cleaned up successfully',
+            'deleted_count' => $deletedCount
+        ]);
     }
 
     private function checkGeofencing($latitude, $longitude)

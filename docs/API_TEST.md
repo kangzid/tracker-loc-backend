@@ -359,12 +359,94 @@ Method: DELETE
 Authorization: Bearer {admin_token}
 ```
 
-### Attendances (View Only)
+### Attendances Management
+
+#### Get All Attendances
 
 ```
 URL: http://localhost:8000/api/attendances
 Method: GET
 Authorization: Bearer {admin_token}
+```
+
+#### Get Employee Monthly Attendances (Admin Only)
+
+```
+URL: http://localhost:8000/api/admin/attendances/employee/{employee_id}
+Method: GET
+Authorization: Bearer {admin_token}
+Query Parameters:
+- month (optional): 1-12 (default: current month)
+- year (optional): YYYY (default: current year)
+
+// Example: Get current month
+http://localhost:8000/api/admin/attendances/employee/1
+
+// Example: Get September 2025
+http://localhost:8000/api/admin/attendances/employee/1?month=9&year=2025
+
+// Response includes all days in month with attendance data
+{
+    "month": 9,
+    "year": 2025,
+    "days_in_month": 30,
+    "attendances": [
+        {
+            "date": "2025-09-01",
+            "day_name": "Sunday",
+            "attendance": null
+        },
+        {
+            "date": "2025-09-02",
+            "day_name": "Monday", 
+            "attendance": {
+                "id": 1,
+                "check_in": "08:00:00",
+                "check_out": "17:00:00",
+                "status": "present"
+            }
+        }
+    ]
+}
+```
+
+#### Edit Attendance (Admin Only - Max 7 days old)
+
+```
+URL: http://localhost:8000/api/admin/attendances/{id}
+Method: PUT
+Authorization: Bearer {admin_token}
+Content-Type: application/json
+
+{
+    "check_in": "08:30",
+    "check_out": "17:00",
+    "status": "late",
+    "notes": "Terlambat karena macet"
+}
+
+// Note: Can only edit attendance within 7 days from attendance date
+```
+
+#### Delete Attendance (Admin Only - Max 7 days old)
+
+```
+URL: http://localhost:8000/api/admin/attendances/{id}
+Method: DELETE
+Authorization: Bearer {admin_token}
+
+// Note: Can only delete attendance within 7 days from attendance date
+```
+
+#### Cleanup Old Attendances (Admin Only)
+
+```
+URL: http://localhost:8000/api/admin/attendances/cleanup
+Method: POST
+Authorization: Bearer {admin_token}
+
+// Manually delete all attendances older than 3 months
+// Auto cleanup runs monthly via scheduled task
 ```
 
 ## 3. Employee Endpoints

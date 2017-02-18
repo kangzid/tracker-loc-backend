@@ -5,66 +5,76 @@ Sistem tracking lokasi karyawan dan kendaraan operasional berbasis Laravel API.
 ## Fitur Utama
 
 1. **Absensi berbasis lokasi (Geofencing)**
-   - Check-in/out dengan validasi lokasi
-   - Deteksi otomatis area kantor
+
+    - Check-in/out dengan validasi lokasi
+    - Deteksi otomatis area kantor
 
 2. **Tracking kendaraan operasional**
-   - Real-time location tracking
-   - History perjalanan kendaraan
+
+    - Real-time location tracking
+    - History perjalanan kendaraan
 
 3. **Live monitoring (karyawan & kendaraan)**
-   - Dashboard real-time
-   - Status aktif karyawan dan kendaraan
+
+    - Dashboard real-time
+    - Status aktif karyawan dan kendaraan
 
 4. **Geofencing otomatis**
-   - Area kantor dan area kerja
-   - Notifikasi masuk/keluar area
+
+    - Area kantor dan area kerja
+    - Notifikasi masuk/keluar area
 
 5. **Task assignment (tugas lapangan)**
-   - Assign tugas ke karyawan
-   - Tracking progress tugas
+
+    - Assign tugas ke karyawan
+    - Tracking progress tugas
 
 6. **Sharing lokasi sementara**
-   - Share lokasi dengan token
-   - Expired time untuk keamanan
+
+    - Share lokasi dengan token
+    - Expired time untuk keamanan
 
 7. **Analitik & laporan otomatis**
-   - Dashboard statistik
-   - Laporan kehadiran dan produktivitas
+    - Dashboard statistik
+    - Laporan kehadiran dan produktivitas
 
 ## User Roles
 
-- **Admin/Manajer HR**: Kelola absensi & laporan
-- **Manajer Armada**: Lihat posisi kendaraan & jarak tempuh  
-- **Karyawan Lapangan**: Absen, terima tugas, panic button
-- **Manajemen**: Ringkasan kinerja dari dashboard
+-   **Admin/Manajer HR**: Kelola absensi & laporan
+-   **Manajer Armada**: Lihat posisi kendaraan & jarak tempuh
+-   **Karyawan Lapangan**: Absen, terima tugas, panic button
+-   **Manajemen**: Ringkasan kinerja dari dashboard
 
 ## Tech Stack
 
-- Laravel 11
-- MySQL Database
-- Laravel Sanctum (API Authentication)
-- RESTful API
+-   Laravel 11
+-   MySQL Database
+-   Laravel Sanctum (API Authentication)
+-   RESTful API
 
 ## Installation
 
 1. Clone repository
+
 ```bash
 git clone <repository-url>
 cd LocaTrack-backend
 ```
 
 2. Install dependencies
+
 ```bash
 composer install
 ```
 
 3. Setup environment
+
 ```bash
 cp .env.example .env
 ```
 
 4. Configure database di `.env`:
+
 ```env
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
@@ -75,16 +85,19 @@ DB_PASSWORD=
 ```
 
 5. Generate application key
+
 ```bash
 php artisan key:generate
 ```
 
 6. Run migrations dan seeder
+
 ```bash
 php artisan migrate --seed
 ```
 
 7. Start development server
+
 ```bash
 php artisan serve
 ```
@@ -94,25 +107,32 @@ API akan tersedia di: `http://localhost:8000/api`
 ## Database Schema
 
 ### Users
-- id, name, email, password, role (admin/employee), is_active
 
-### Employees  
-- id, user_id, employee_id, phone, address, department, position, latitude, longitude
+-   id, name, email, password, role (admin/employee), is_active
+
+### Employees
+
+-   id, user_id, employee_id, phone, address, department, position, latitude, longitude
 
 ### Vehicles
-- id, vehicle_number, vehicle_type, brand, model, year, latitude, longitude, is_active
+
+-   id, vehicle_number, vehicle_type, brand, model, year, latitude, longitude, is_active
 
 ### Attendances
-- id, employee_id, date, check_in, check_out, check_in_lat/lng, check_out_lat/lng, status
+
+-   id, employee_id, date, check_in, check_out, check_in_lat/lng, check_out_lat/lng, status
 
 ### Tasks
-- id, title, description, assigned_to, assigned_by, latitude, longitude, status, priority, due_date
+
+-   id, title, description, assigned_to, assigned_by, latitude, longitude, status, priority, due_date
 
 ### Locations (Polymorphic)
-- id, trackable_type, trackable_id, latitude, longitude, speed, accuracy, recorded_at
+
+-   id, trackable_type, trackable_id, latitude, longitude, speed, accuracy, recorded_at
 
 ### Geofences
-- id, name, center_lat, center_lng, radius, type, is_active
+
+-   id, name, center_lat, center_lng, radius, type, is_active
 
 ## API Documentation
 
@@ -122,12 +142,25 @@ Untuk testing API, lihat `docs/API_TEST.md`.
 ## Default Users
 
 ### Admin
-- Email: admin@locatrack.com
-- Password: password123
+
+-   Email: admin@locatrack.com
+-   Password: password123
 
 ### Karyawan
-- Email: john@locatrack.com / jane@locatrack.com
-- Password: password123
+
+-   Email: john@locatrack.com / jane@locatrack.com
+-   Password: password123
+
+## Deployment ke cPanel
+
+1. Zip semua file project
+2. Upload ke folder `public_html` di cPanel
+3. Extract file
+4. Pindahkan isi folder `public` ke root `public_html`
+5. Edit `index.php` untuk mengarah ke folder Laravel
+6. Setup database MySQL di cPanel
+7. Update file `.env` dengan kredensial database
+8. Jalankan migration via terminal cPanel atau import SQL
 
 ## Contributing
 
