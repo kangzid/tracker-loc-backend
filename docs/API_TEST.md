@@ -74,6 +74,33 @@ Method: GET
 Authorization: Bearer {admin_token}
 ```
 
+#### Update User/Admin
+
+```
+URL: http://localhost:8000/api/users/{id}
+Method: PUT
+Authorization: Bearer {admin_token}
+Content-Type: application/json
+
+{
+    "name": "Updated Admin Name",
+    "email": "updated@admin.com",
+    "password": "newpassword123",
+    "role": "admin",
+    "is_active": true
+}
+```
+
+#### Delete User/Admin
+
+```
+URL: http://localhost:8000/api/users/{id}
+Method: DELETE
+Authorization: Bearer {admin_token}
+
+// Note: Cannot delete your own account
+```
+
 ### Employees CRUD
 
 #### Get All Employees
