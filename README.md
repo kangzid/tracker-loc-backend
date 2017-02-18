@@ -42,12 +42,12 @@ Sistem tracking lokasi karyawan dan kendaraan operasional berbasis Laravel API.
 
 -   **Admin/Manajer HR**: Kelola absensi & laporan
 -   **Manajer Armada**: Lihat posisi kendaraan & jarak tempuh
--   **Karyawan Lapangan**: Absen, terima tugas, panic button
+-   **Karyawan Lapangan**: Absen, terima tugas
 -   **Manajemen**: Ringkasan kinerja dari dashboard
 
 ## Tech Stack
 
--   Laravel 11
+-   Laravel 12
 -   MySQL Database
 -   Laravel Sanctum (API Authentication)
 -   RESTful API
@@ -57,7 +57,7 @@ Sistem tracking lokasi karyawan dan kendaraan operasional berbasis Laravel API.
 1. Clone repository
 
 ```bash
-git clone <repository-url>
+git clone <https://github.com/kangzid/LocaTrack-backend>
 cd LocaTrack-backend
 ```
 
@@ -150,17 +150,6 @@ Untuk testing API, lihat `docs/API_TEST.md`.
 
 -   Email: john@locatrack.com / jane@locatrack.com
 -   Password: password123
-
-## Deployment ke cPanel
-
-1. Zip semua file project
-2. Upload ke folder `public_html` di cPanel
-3. Extract file
-4. Pindahkan isi folder `public` ke root `public_html`
-5. Edit `index.php` untuk mengarah ke folder Laravel
-6. Setup database MySQL di cPanel
-7. Update file `.env` dengan kredensial database
-8. Jalankan migration via terminal cPanel atau import SQL
 
 ## Contributing
 
