@@ -9,17 +9,7 @@ class Subscription extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
-        'user_id',
-        'plan',
-        'max_employees',
-        'max_vehicles',
-        'company_name',
-        'contact_phone',
-        'started_at',
-        'expired_at',
-        'status',
-    ];
+    protected $guarded = ['id'];
 
     protected function casts(): array
     {

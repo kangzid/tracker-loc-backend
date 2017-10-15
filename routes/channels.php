@@ -12,3 +12,7 @@ Broadcast::channel('location.{trackableType}.{trackableId}', function ($user, $t
     // Gunakan LocationChannel untuk authorization logic
     return app('App\Broadcasting\LocationChannel')->join($user, $trackableType, $trackableId);
 });
+
+Broadcast::channel('support.chat.{id}', function ($user, $id) {
+    return (int) $user->id === (int) $id;
+});

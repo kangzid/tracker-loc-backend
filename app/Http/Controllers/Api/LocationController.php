@@ -33,7 +33,14 @@ class LocationController extends Controller
         if ($request->trackable_type === 'employee') {
             $employee = $request->user()->employee;
             if (!$employee || $employee->id != $request->trackable_id) {
-                return response()->json(['message' => 'Unauthorized'], 403);
+                return response()->json([
+                    'message' => 'Unauthorized Location Update',
+                    'debug' => [
+                        'user_id' => $request->user()->id,
+                        'employee_id' => $employee ? $employee->id : null,
+                        'requested_id' => $request->trackable_id
+                    ]
+                ], 403);
             }
             $trackable = $employee;
             $entityName = $employee->user->name;

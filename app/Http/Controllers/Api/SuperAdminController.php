@@ -41,18 +41,53 @@ class SuperAdminController extends Controller
             })->count();
         $trialSubs = Subscription::where('plan', 'trial')->where('status', 'active')->count();
 
+        // Statistik Pendapatan (Bulan Ini)
+        $currentMonthRevenue = \App\Models\Transaction::where('payment_status', 'settlement')
+            ->whereMonth('created_at', now()->month)
+            ->whereYear('created_at', now()->year)
+            ->sum('final_price');
+
+        // Data Grafik Pendapatan (14 hari terakhir)
+        $revenueChart = [];
+        for ($i = 13; $i >= 0; $i--) {
+            $date = now()->subDays($i)->format('Y-m-d');
+            $revenueChart[] = [
+                'date' => now()->subDays($i)->format('d M'),
+                'amount' => \App\Models\Transaction::where('payment_status', 'settlement')
+                    ->whereDate('created_at', $date)
+                    ->sum('final_price')
+            ];
+        }
+
+        // Statistik Pemakaian Sistem (Tenant Baru per hari - 14 hari terakhir)
+        $usageChart = [];
+        for ($i = 13; $i >= 0; $i--) {
+            $date = now()->subDays($i)->format('Y-m-d');
+            $usageChart[] = [
+                'date' => now()->subDays($i)->format('d M'),
+                'count' => User::where('role', 'admin')
+                    ->whereDate('created_at', $date)
+                    ->count()
+            ];
+        }
+
         return response()->json([
             'summary' => [
                 'total_admins' => $totalAdmins,
                 'active_admins' => $activeAdmins,
                 'total_employees' => $totalEmployees,
                 'total_vehicles' => $totalVehicles,
+                'monthly_revenue' => (int)$currentMonthRevenue,
             ],
             'subscriptions' => [
                 'active' => $activeSubs,
                 'expired' => $expiredSubs,
                 'trial' => $trialSubs,
             ],
+            'charts' => [
+                'revenue' => $revenueChart,
+                'usage' => $usageChart,
+            ]
         ]);
     }
 
@@ -359,11 +394,11 @@ class SuperAdminController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'plan' => 'sometimes|in:trial,monthly,yearly',
+            'plan' => 'sometimes|in:trial,starter,pro,enterprise',
             'max_employees' => 'sometimes|integer|min:1',
             'max_vehicles' => 'sometimes|integer|min:1',
-            'expired_at' => 'sometimes|date|after:now',
-            'status' => 'sometimes|in:active,expired,cancelled',
+            'expired_at' => 'sometimes|date',
+            'status' => 'sometimes|in:active,inactive,expired,cancelled',
         ]);
 
         if ($validator->fails()) {

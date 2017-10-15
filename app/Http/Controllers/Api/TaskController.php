@@ -36,6 +36,10 @@ class TaskController extends Controller
             $tasks = Task::with(['assignedBy:id,name,email'])
                 ->select('id', 'admin_id', 'title', 'description', 'assigned_to', 'assigned_by', 'status', 'priority', 'due_date', 'created_at', 'updated_at')
                 ->forEmployee($employee->id)
+                ->where(function ($q) {
+                    $q->where('completion_notes', 'NOT LIKE', '%[HIDDEN_BY_EMPLOYEE]%')
+                      ->orWhereNull('completion_notes');
+                })
                 ->orderBy('created_at', 'desc')
                 ->paginate(20);
         }
@@ -150,6 +154,32 @@ class TaskController extends Controller
         return response()->json(['message' => 'Task deleted successfully']);
     }
 
+    public function hideByEmployee(Request $request, $id)
+    {
+        $task = Task::findOrFail($id);
+        $employee = $request->user()->employee;
+
+        if (!$employee || $task->assigned_to != $employee->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        // Only allow hiding completed or cancelled tasks
+        if (!in_array($task->status, ['completed', 'cancelled'])) {
+            return response()->json(['message' => 'Hanya tugas yang sudah selesai atau dibatalkan yang bisa disembunyikan'], 400);
+        }
+
+        $marker = ' [HIDDEN_BY_EMPLOYEE]';
+        
+        // Prevent duplicate appending
+        if (strpos($task->completion_notes, $marker) === false) {
+            $task->update([
+                'completion_notes' => ($task->completion_notes ?? '') . $marker
+            ]);
+        }
+
+        return response()->json(['message' => 'Tugas berhasil disembunyikan']);
+    }
+
     public function myTasks(Request $request)
     {
         $employee = $request->user()->employee;
@@ -163,7 +193,11 @@ class TaskController extends Controller
         // OPTIMIZATION: Use query scopes
         $query = Task::with(['assignedBy:id,name,email'])
             ->select('id', 'admin_id', 'title', 'description', 'assigned_to', 'assigned_by', 'status', 'priority', 'due_date', 'created_at', 'updated_at')
-            ->forEmployee($employee->id);
+            ->forEmployee($employee->id)
+            ->where(function ($q) {
+                $q->where('completion_notes', 'NOT LIKE', '%[HIDDEN_BY_EMPLOYEE]%')
+                  ->orWhereNull('completion_notes');
+            });
 
         if ($status) {
             $query->where('status', $status);
@@ -183,7 +217,7 @@ class TaskController extends Controller
         $task = Task::findOrFail($id);
         $employee = $request->user()->employee;
 
-        if (!$employee || $task->assigned_to !== $employee->id) {
+        if (!$employee || $task->assigned_to != $employee->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -204,7 +238,7 @@ class TaskController extends Controller
         $task = Task::findOrFail($id);
         $employee = $request->user()->employee;
 
-        if (!$employee || $task->assigned_to !== $employee->id) {
+        if (!$employee || $task->assigned_to != $employee->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -235,7 +269,7 @@ class TaskController extends Controller
         $task = Task::findOrFail($id);
         $employee = $request->user()->employee;
 
-        if (!$employee || $task->assigned_to !== $employee->id) {
+        if (!$employee || $task->assigned_to != $employee->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 

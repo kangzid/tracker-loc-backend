@@ -80,6 +80,39 @@ class NotificationController extends Controller
     }
 
     /**
+     * Employee - Delete a single notification
+     */
+    public function destroy(Request $request, $id)
+    {
+        $employee = $request->user()->employee;
+        if (!$employee) {
+            return response()->json(['message' => 'Employee profile not found'], 404);
+        }
+
+        $notification = Notification::where('employee_id', $employee->id)
+            ->findOrFail($id);
+
+        $notification->delete();
+
+        return response()->json(['message' => 'Notification deleted successfully']);
+    }
+
+    /**
+     * Employee - Delete all notifications for the current employee
+     */
+    public function destroyAll(Request $request)
+    {
+        $employee = $request->user()->employee;
+        if (!$employee) {
+            return response()->json(['message' => 'Employee profile not found'], 404);
+        }
+
+        Notification::where('employee_id', $employee->id)->delete();
+
+        return response()->json(['message' => 'All notifications deleted successfully']);
+    }
+
+    /**
      * Admin - Get admin notifications (broadcast + task completion)
      * For polling support (called every 30 seconds from Svelte)
      */
@@ -143,5 +176,19 @@ class NotificationController extends Controller
         $status->update(['deleted_by_admin_at' => now()]);
 
         return response()->json(['message' => 'Notification removed']);
+    }
+
+    /**
+     * Increment view count for a notification
+     */
+    public function incrementView(Request $request, $id)
+    {
+        $notification = Notification::findOrFail($id);
+        $notification->increment('views');
+        
+        return response()->json([
+            'message' => 'View count incremented',
+            'views' => $notification->views
+        ]);
     }
 }
