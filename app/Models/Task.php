@@ -4,10 +4,19 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
 
 class Task extends Model
 {
     use HasFactory;
+
+    /**
+     * Prepare a date for array / JSON serialization.
+     */
+    protected function serializeDate(\DateTimeInterface $date)
+    {
+        return $date->format('Y-m-d H:i:s');
+    }
 
     protected $fillable = [
         'admin_id',
@@ -35,6 +44,48 @@ class Task extends Model
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
         ];
+    }
+
+    // OPTIMIZATION: Query Scopes for common filters
+    public function scopePending(Builder $query): Builder
+    {
+        return $query->where('status', 'pending');
+    }
+
+    public function scopeInProgress(Builder $query): Builder
+    {
+        return $query->where('status', 'in_progress');
+    }
+
+    public function scopeCompleted(Builder $query): Builder
+    {
+        return $query->where('status', 'completed');
+    }
+
+    public function scopeByPriority(Builder $query, string $priority): Builder
+    {
+        return $query->where('priority', $priority);
+    }
+
+    public function scopeUrgent(Builder $query): Builder
+    {
+        return $query->where('priority', 'urgent');
+    }
+
+    public function scopeOverdue(Builder $query): Builder
+    {
+        return $query->where('due_date', '<', now())
+                     ->whereNotIn('status', ['completed', 'cancelled']);
+    }
+
+    public function scopeForEmployee(Builder $query, int $employeeId): Builder
+    {
+        return $query->where('assigned_to', $employeeId);
+    }
+
+    public function scopeForAdmin(Builder $query, int $adminId): Builder
+    {
+        return $query->where('admin_id', $adminId);
     }
 
     public function employee()

@@ -1,0 +1,871 @@
+================================================================
+    LOCATRACK BACKEND API - DOKUMENTASI FITUR EMPLOYEE
+================================================================
+Base URL : http://localhost:8000/api
+Auth Type: Bearer Token (diperoleh setelah login)
+================================================================
+
+
+================================================================
+## 1. AUTHENTICATION
+================================================================
+
+### 1.1 Login Employee
+
+URL    : http://localhost:8000/api/login
+Method : POST
+Headers:
+  Content-Type: application/json
+
+Body:
+{
+    "email": "employee@locatrack.com",
+    "password": "password"
+}
+
+HASIL (Response):
+{
+    "message": "Login successful",
+    "user": {
+        "id": 5,
+        "name": "Budi Santoso",
+        "email": "employee@locatrack.com",
+        "role": "employee",
+        "is_active": true,
+        "employee": {
+            "id": 3,
+            "employee_id": "EMP003",
+            "phone": "08123456789",
+            "department": "IT",
+            "position": "Developer",
+            "admin_id": 1
+        },
+        "created_at": "2025-09-25T15:44:48.000000Z",
+        "updated_at": "2025-09-25T15:44:48.000000Z"
+    },
+    "token": "12|RGmmkuWXGT7LjgCfTzSgkfXxQGaw0PTZxGzEyMz14d172861",
+    "token_type": "Bearer"
+}
+
+----------------------------------------------------------------
+
+### 1.2 Logout
+
+URL    : http://localhost:8000/api/logout
+Method : POST
+Headers:
+  Authorization: Bearer {token}
+
+Body   : (tidak ada / kosong)
+
+HASIL (Response):
+{
+    "message": "Logged out successfully"
+}
+
+----------------------------------------------------------------
+
+### 1.3 Lihat Profil
+
+URL    : http://localhost:8000/api/profile
+Method : GET
+Headers:
+  Authorization: Bearer {token}
+
+HASIL (Response):
+{
+    "id": 5,
+    "name": "Budi Santoso",
+    "email": "employee@locatrack.com",
+    "role": "employee",
+    "is_active": true,
+    "employee": {
+        "id": 3,
+        "employee_id": "EMP003",
+        "phone": "08123456789",
+        "department": "IT",
+        "position": "Developer",
+        "admin_id": 1,
+        "created_at": "2025-09-25T15:44:48.000000Z",
+        "updated_at": "2025-09-25T15:44:48.000000Z"
+    },
+    "created_at": "2025-09-25T15:44:48.000000Z",
+    "updated_at": "2025-09-25T15:44:48.000000Z"
+}
+
+----------------------------------------------------------------
+
+### 1.4 Ganti Password
+
+URL    : http://localhost:8000/api/change-password
+Method : PUT
+Headers:
+  Authorization: Bearer {token}
+  Content-Type : application/json
+  Accept       : application/json
+
+Body:
+{
+    "current_password": "password",
+    "password": "newpassword123",
+    "password_confirmation": "newpassword123"
+}
+
+HASIL (Response - Berhasil):
+{
+    "message": "Password changed successfully"
+}
+
+HASIL (Response - Gagal, password lama salah):
+{
+    "message": "Current password is incorrect"
+}
+
+
+================================================================
+## 2. ABSENSI (ATTENDANCE)
+================================================================
+
+### 2.1 Check In / Check Out
+
+URL    : http://localhost:8000/api/attendances
+Method : POST
+Headers:
+  Authorization: Bearer {token}
+  Content-Type : application/json
+
+Body (Check In):
+{
+    "latitude": -6.200000,
+    "longitude": 106.816666,
+    "type": "check_in"
+}
+
+Body (Check Out):
+{
+    "latitude": -6.200000,
+    "longitude": 106.816666,
+    "type": "check_out"
+}
+
+HASIL (Response - Check In berhasil):
+{
+    "message": "Check-in successful",
+    "attendance": {
+        "id": 15,
+        "employee_id": 3,
+        "date": "2025-10-01",
+        "check_in": "08:02:33",
+        "check_out": null,
+        "latitude_in": -6.2,
+        "longitude_in": 106.816666,
+        "latitude_out": null,
+        "longitude_out": null,
+        "status": "present",
+        "created_at": "2025-10-01T01:02:33.000000Z",
+        "updated_at": "2025-10-01T01:02:33.000000Z"
+    }
+}
+
+HASIL (Response - Check Out berhasil):
+{
+    "message": "Check-out successful",
+    "attendance": {
+        "id": 15,
+        "employee_id": 3,
+        "date": "2025-10-01",
+        "check_in": "08:02:33",
+        "check_out": "17:05:10",
+        "latitude_in": -6.2,
+        "longitude_in": 106.816666,
+        "latitude_out": -6.2,
+        "longitude_out": 106.816666,
+        "status": "present",
+        "created_at": "2025-10-01T01:02:33.000000Z",
+        "updated_at": "2025-10-01T10:05:10.000000Z"
+    }
+}
+
+----------------------------------------------------------------
+
+### 2.2 Cek Status Lokasi (Apakah Dalam Radius Kantor)
+
+URL    : http://localhost:8000/api/attendances/check-location
+Method : POST
+Headers:
+  Authorization: Bearer {token}
+  Content-Type : application/json
+
+Body:
+{
+    "latitude": -6.200000,
+    "longitude": 106.816666
+}
+
+HASIL (Response - Di dalam radius):
+{
+    "is_within_radius": true,
+    "distance_meters": 45.5,
+    "office": {
+        "name": "Kantor Pusat",
+        "radius_meters": 100,
+        "latitude": -6.200500,
+        "longitude": 106.817000
+    }
+}
+
+HASIL (Response - Di luar radius):
+{
+    "is_within_radius": false,
+    "distance_meters": 350.2,
+    "office": {
+        "name": "Kantor Pusat",
+        "radius_meters": 100,
+        "latitude": -6.200500,
+        "longitude": 106.817000
+    }
+}
+
+----------------------------------------------------------------
+
+### 2.3 Absensi Hari Ini
+
+URL    : http://localhost:8000/api/attendances/today
+Method : GET
+Headers:
+  Authorization: Bearer {token}
+
+HASIL (Response - Sudah check in):
+{
+    "data": {
+        "id": 15,
+        "employee_id": 3,
+        "date": "2025-10-01",
+        "check_in": "08:02:33",
+        "check_out": null,
+        "status": "present",
+        "latitude_in": -6.2,
+        "longitude_in": 106.816666,
+        "latitude_out": null,
+        "longitude_out": null,
+        "created_at": "2025-10-01T01:02:33.000000Z",
+        "updated_at": "2025-10-01T01:02:33.000000Z"
+    }
+}
+
+HASIL (Response - Belum check in):
+{
+    "data": null,
+    "message": "No attendance record found for today"
+}
+
+----------------------------------------------------------------
+
+### 2.4 Absensi Bulan Ini (Monthly)
+
+URL    : http://localhost:8000/api/attendances/monthly
+Method : GET
+Headers:
+  Authorization: Bearer {token}
+
+HASIL (Response):
+{
+    "data": [
+        {
+            "id": 10,
+            "employee_id": 3,
+            "date": "2025-09-28",
+            "check_in": "08:00:00",
+            "check_out": "17:00:00",
+            "status": "present",
+            "created_at": "2025-09-28T01:00:00.000000Z",
+            "updated_at": "2025-09-28T10:00:00.000000Z"
+        },
+        {
+            "id": 11,
+            "employee_id": 3,
+            "date": "2025-09-29",
+            "check_in": "08:30:00",
+            "check_out": "17:15:00",
+            "status": "late",
+            "created_at": "2025-09-29T01:30:00.000000Z",
+            "updated_at": "2025-09-29T10:15:00.000000Z"
+        }
+    ],
+    "summary": {
+        "total_present": 18,
+        "total_late": 2,
+        "total_absent": 1,
+        "month": "September",
+        "year": 2025
+    }
+}
+
+----------------------------------------------------------------
+
+### 2.5 Riwayat Seluruh Absensi
+
+URL    : http://localhost:8000/api/attendances
+Method : GET
+Headers:
+  Authorization: Bearer {token}
+
+HASIL (Response):
+{
+    "data": [
+        {
+            "id": 15,
+            "employee_id": 3,
+            "date": "2025-10-01",
+            "check_in": "08:02:33",
+            "check_out": "17:05:10",
+            "status": "present",
+            "created_at": "2025-10-01T01:02:33.000000Z",
+            "updated_at": "2025-10-01T10:05:10.000000Z"
+        },
+        {
+            "id": 14,
+            "employee_id": 3,
+            "date": "2025-09-30",
+            "check_in": "08:10:00",
+            "check_out": "17:00:00",
+            "status": "present",
+            "created_at": "2025-09-30T01:10:00.000000Z",
+            "updated_at": "2025-09-30T10:00:00.000000Z"
+        }
+    ],
+    "meta": {
+        "current_page": 1,
+        "last_page": 3,
+        "per_page": 10,
+        "total": 25
+    }
+}
+
+----------------------------------------------------------------
+
+### 2.6 Detail Absensi (By ID)
+
+URL    : http://localhost:8000/api/attendances/{id}
+Method : GET
+Headers:
+  Authorization: Bearer {token}
+
+Contoh URL: http://localhost:8000/api/attendances/15
+
+HASIL (Response):
+{
+    "data": {
+        "id": 15,
+        "employee_id": 3,
+        "date": "2025-10-01",
+        "check_in": "08:02:33",
+        "check_out": "17:05:10",
+        "latitude_in": -6.2,
+        "longitude_in": 106.816666,
+        "latitude_out": -6.2,
+        "longitude_out": 106.816666,
+        "status": "present",
+        "notes": null,
+        "employee": {
+            "id": 3,
+            "employee_id": "EMP003",
+            "name": "Budi Santoso",
+            "department": "IT",
+            "position": "Developer"
+        },
+        "created_at": "2025-10-01T01:02:33.000000Z",
+        "updated_at": "2025-10-01T10:05:10.000000Z"
+    }
+}
+
+
+================================================================
+## 3. TUGAS (TASKS)
+================================================================
+
+### 3.1 Lihat Semua Tugas Saya
+
+URL    : http://localhost:8000/api/my-tasks
+Method : GET
+Headers:
+  Authorization: Bearer {token}
+  Accept       : application/json
+
+HASIL (Response):
+{
+    "data": [
+        {
+            "id": 7,
+            "title": "Survey Lokasi Cabang Baru",
+            "description": "Lakukan survey ke lokasi rencana pembukaan cabang baru di Bekasi.",
+            "priority": "high",
+            "status": "pending",
+            "due_date": "2025-10-05",
+            "assigned_employee_id": 3,
+            "created_at": "2025-09-30T10:00:00.000000Z",
+            "updated_at": "2025-09-30T10:00:00.000000Z"
+        },
+        {
+            "id": 8,
+            "title": "Antar Dokumen ke Klien",
+            "description": "Antar dokumen kontrak ke kantor klien di Jakarta Selatan.",
+            "priority": "medium",
+            "status": "in_progress",
+            "due_date": "2025-10-03",
+            "assigned_employee_id": 3,
+            "created_at": "2025-09-29T09:00:00.000000Z",
+            "updated_at": "2025-10-01T08:00:00.000000Z"
+        }
+    ],
+    "meta": {
+        "current_page": 1,
+        "last_page": 1,
+        "per_page": 15,
+        "total": 2
+    }
+}
+
+----------------------------------------------------------------
+
+### 3.2 Filter Tugas Berdasarkan Prioritas
+
+URL    : http://localhost:8000/api/my-tasks?priority=urgent
+Method : GET
+Headers:
+  Authorization: Bearer {token}
+  Accept       : application/json
+
+Query Parameter:
+  priority = low | medium | high | urgent
+
+HASIL (Response):
+{
+    "data": [
+        {
+            "id": 9,
+            "title": "Laporan Darurat Keselamatan",
+            "description": "Segera buat laporan insiden keselamatan di gudang B.",
+            "priority": "urgent",
+            "status": "pending",
+            "due_date": "2025-10-01",
+            "assigned_employee_id": 3,
+            "created_at": "2025-10-01T07:00:00.000000Z",
+            "updated_at": "2025-10-01T07:00:00.000000Z"
+        }
+    ],
+    "meta": {
+        "current_page": 1,
+        "last_page": 1,
+        "per_page": 15,
+        "total": 1
+    }
+}
+
+----------------------------------------------------------------
+
+### 3.3 Filter Tugas Berdasarkan Status & Prioritas
+
+URL    : http://localhost:8000/api/my-tasks?status=pending&priority=high
+Method : GET
+Headers:
+  Authorization: Bearer {token}
+
+Query Parameter:
+  status   = pending | accepted | in_progress | completed
+  priority = low | medium | high | urgent
+
+HASIL (Response):
+{
+    "data": [
+        {
+            "id": 7,
+            "title": "Survey Lokasi Cabang Baru",
+            "description": "Lakukan survey ke lokasi rencana pembukaan cabang baru di Bekasi.",
+            "priority": "high",
+            "status": "pending",
+            "due_date": "2025-10-05",
+            "assigned_employee_id": 3,
+            "created_at": "2025-09-30T10:00:00.000000Z",
+            "updated_at": "2025-09-30T10:00:00.000000Z"
+        }
+    ],
+    "meta": {
+        "current_page": 1,
+        "last_page": 1,
+        "per_page": 15,
+        "total": 1
+    }
+}
+
+----------------------------------------------------------------
+
+### 3.4 Detail Tugas (By ID)
+
+URL    : http://localhost:8000/api/tasks/{id}
+Method : GET
+Headers:
+  Authorization: Bearer {token}
+  Accept       : application/json
+
+Contoh URL: http://localhost:8000/api/tasks/7
+
+HASIL (Response):
+{
+    "data": {
+        "id": 7,
+        "title": "Survey Lokasi Cabang Baru",
+        "description": "Lakukan survey ke lokasi rencana pembukaan cabang baru di Bekasi.",
+        "priority": "high",
+        "status": "pending",
+        "due_date": "2025-10-05",
+        "completion_notes": null,
+        "completion_latitude": null,
+        "completion_longitude": null,
+        "assigned_employee_id": 3,
+        "created_by": 1,
+        "created_at": "2025-09-30T10:00:00.000000Z",
+        "updated_at": "2025-09-30T10:00:00.000000Z"
+    }
+}
+
+----------------------------------------------------------------
+
+### 3.5 Terima Tugas (Accept Task)
+
+URL    : http://localhost:8000/api/tasks/{id}/accept
+Method : POST
+Headers:
+  Authorization: Bearer {token}
+
+Contoh URL: http://localhost:8000/api/tasks/7/accept
+
+Body   : (tidak ada / kosong)
+
+HASIL (Response):
+{
+    "message": "Task accepted successfully",
+    "task": {
+        "id": 7,
+        "title": "Survey Lokasi Cabang Baru",
+        "status": "accepted",
+        "updated_at": "2025-10-01T08:30:00.000000Z"
+    }
+}
+
+----------------------------------------------------------------
+
+### 3.6 Mulai Tugas (Start Task)
+
+URL    : http://localhost:8000/api/tasks/{id}/start
+Method : POST
+Headers:
+  Authorization: Bearer {token}
+
+Contoh URL: http://localhost:8000/api/tasks/7/start
+
+Body   : (tidak ada / kosong)
+
+HASIL (Response):
+{
+    "message": "Task started successfully",
+    "task": {
+        "id": 7,
+        "title": "Survey Lokasi Cabang Baru",
+        "status": "in_progress",
+        "updated_at": "2025-10-01T09:00:00.000000Z"
+    }
+}
+
+----------------------------------------------------------------
+
+### 3.7 Selesaikan Tugas (Complete Task)
+
+URL    : http://localhost:8000/api/tasks/{id}/complete
+Method : POST
+Headers:
+  Authorization: Bearer {token}
+  Content-Type : application/json
+
+Contoh URL: http://localhost:8000/api/tasks/7/complete
+
+Body:
+{
+    "completion_notes": "Survey selesai. Lokasi strategis, cocok untuk cabang baru.",
+    "latitude": -6.21462,
+    "longitude": 106.84513
+}
+
+Catatan:
+  - "completion_notes" : opsional, catatan penyelesaian tugas
+  - "latitude"          : opsional, koordinat lokasi saat menyelesaikan tugas
+  - "longitude"         : opsional, koordinat lokasi saat menyelesaikan tugas
+
+HASIL (Response):
+{
+    "message": "Task completed successfully",
+    "task": {
+        "id": 7,
+        "title": "Survey Lokasi Cabang Baru",
+        "status": "completed",
+        "completion_notes": "Survey selesai. Lokasi strategis, cocok untuk cabang baru.",
+        "completion_latitude": -6.21462,
+        "completion_longitude": 106.84513,
+        "updated_at": "2025-10-01T14:45:00.000000Z"
+    }
+}
+
+
+================================================================
+## 4. NOTIFIKASI (NOTIFICATIONS)
+================================================================
+
+### 4.1 Lihat Semua Notifikasi
+
+URL    : http://localhost:8000/api/notifications
+Method : GET
+Headers:
+  Authorization: Bearer {token}
+
+HASIL (Response):
+{
+    "data": [
+        {
+            "id": 3,
+            "title": "Tugas Baru Ditetapkan",
+            "message": "Anda mendapatkan tugas baru: Survey Lokasi Cabang Baru",
+            "type": "task",
+            "is_read": false,
+            "created_at": "2025-09-30T10:00:00.000000Z"
+        },
+        {
+            "id": 2,
+            "title": "Pengingat Absensi",
+            "message": "Jangan lupa untuk melakukan check-out hari ini.",
+            "type": "reminder",
+            "is_read": true,
+            "created_at": "2025-09-29T16:00:00.000000Z"
+        }
+    ],
+    "meta": {
+        "current_page": 1,
+        "last_page": 1,
+        "per_page": 15,
+        "total": 2
+    }
+}
+
+----------------------------------------------------------------
+
+### 4.2 Lihat Notifikasi Belum Dibaca
+
+URL    : http://localhost:8000/api/notifications/unread
+Method : GET
+Headers:
+  Authorization: Bearer {token}
+
+HASIL (Response):
+{
+    "data": [
+        {
+            "id": 3,
+            "title": "Tugas Baru Ditetapkan",
+            "message": "Anda mendapatkan tugas baru: Survey Lokasi Cabang Baru",
+            "type": "task",
+            "is_read": false,
+            "created_at": "2025-09-30T10:00:00.000000Z"
+        }
+    ],
+    "unread_count": 1
+}
+
+----------------------------------------------------------------
+
+### 4.3 Tandai Notifikasi Sebagai Dibaca (By ID)
+
+URL    : http://localhost:8000/api/notifications/{id}/read
+Method : POST
+Headers:
+  Authorization: Bearer {token}
+
+Contoh URL: http://localhost:8000/api/notifications/3/read
+
+Body   : (tidak ada / kosong)
+
+HASIL (Response):
+{
+    "message": "Notification marked as read",
+    "notification": {
+        "id": 3,
+        "title": "Tugas Baru Ditetapkan",
+        "is_read": true,
+        "updated_at": "2025-10-01T09:00:00.000000Z"
+    }
+}
+
+----------------------------------------------------------------
+
+### 4.4 Tandai Semua Notifikasi Sebagai Dibaca
+
+URL    : http://localhost:8000/api/notifications/read-all
+Method : POST
+Headers:
+  Authorization: Bearer {token}
+
+Body   : (tidak ada / kosong)
+
+HASIL (Response):
+{
+    "message": "All notifications marked as read",
+    "updated_count": 3
+}
+
+
+================================================================
+## 5. LOKASI & TRACKING
+================================================================
+
+### 5.1 Update Lokasi (Real-time Tracking)
+
+URL    : http://localhost:8000/api/locations
+Method : POST
+Headers:
+  Authorization: Bearer {token}
+  Content-Type : application/json
+
+Body:
+{
+    "latitude": -6.200000,
+    "longitude": 106.816666,
+    "heading": 90,
+    "speed": 40,
+    "accuracy": 10,
+    "altitude": 100,
+    "trackable_type": "employee",
+    "trackable_id": 3
+}
+
+Keterangan Field:
+  - latitude      : (wajib) koordinat lintang
+  - longitude     : (wajib) koordinat bujur
+  - heading       : (opsional) arah pergerakan dalam derajat (0-360)
+  - speed         : (opsional) kecepatan dalam km/h
+  - accuracy      : (opsional) akurasi GPS dalam meter
+  - altitude      : (opsional) ketinggian dalam meter
+  - trackable_type: (wajib) "employee"
+  - trackable_id  : (wajib) ID employee dari data login
+
+HASIL (Response):
+{
+    "message": "Location updated successfully",
+    "location": {
+        "id": 102,
+        "trackable_type": "employee",
+        "trackable_id": 3,
+        "latitude": -6.2,
+        "longitude": 106.816666,
+        "heading": 90,
+        "speed": 40,
+        "accuracy": 10,
+        "altitude": 100,
+        "recorded_at": "2025-10-01T08:15:00.000000Z",
+        "created_at": "2025-10-01T08:15:00.000000Z"
+    }
+}
+
+----------------------------------------------------------------
+
+### 5.2 Bagikan Lokasi (Share Location)
+
+URL    : http://localhost:8000/api/locations/share
+Method : POST
+Headers:
+  Authorization: Bearer {token}
+  Content-Type : application/json
+
+Body:
+{
+    "duration_minutes": 60
+}
+
+Keterangan:
+  - duration_minutes: durasi berbagi lokasi dalam menit (contoh: 60 = 1 jam)
+
+HASIL (Response):
+{
+    "message": "Location shared successfully",
+    "share_token": "abc123xyz789sharetoken",
+    "share_url": "http://localhost:8000/api/shared-location/abc123xyz789sharetoken",
+    "expires_at": "2025-10-01T09:15:00.000000Z"
+}
+
+
+================================================================
+## 6. DASHBOARD EMPLOYEE
+================================================================
+
+### 6.1 Dashboard Employee
+
+URL    : http://localhost:8000/api/employee/dashboard
+Method : GET
+Headers:
+  Authorization: Bearer {token}
+
+HASIL (Response):
+{
+    "employee": {
+        "id": 3,
+        "name": "Budi Santoso",
+        "employee_id": "EMP003",
+        "department": "IT",
+        "position": "Developer"
+    },
+    "attendance_today": {
+        "status": "present",
+        "check_in": "08:02:33",
+        "check_out": null
+    },
+    "tasks_summary": {
+        "total": 5,
+        "pending": 2,
+        "in_progress": 1,
+        "completed": 2
+    },
+    "unread_notifications": 1,
+    "monthly_attendance": {
+        "total_days": 22,
+        "present": 20,
+        "late": 1,
+        "absent": 1
+    }
+}
+
+
+================================================================
+## CATATAN PENTING
+================================================================
+
+1. Semua endpoint yang membutuhkan AUTH wajib menyertakan header:
+      Authorization: Bearer {token}
+   Dimana {token} adalah token yang diperoleh saat Login.
+
+2. Urutan status Tugas (Tasks):
+      pending -> accepted -> in_progress -> completed
+
+3. Tipe absensi (type) pada Check In/Out:
+      "check_in"  = masuk kerja
+      "check_out" = pulang kerja
+
+4. Priority tugas yang tersedia:
+      low | medium | high | urgent
+
+5. Status tugas yang tersedia untuk filter:
+      pending | accepted | in_progress | completed
+
+6. Untuk fitur tracking real-time, endpoint Update Location
+   (POST /api/locations) dipanggil secara berkala oleh aplikasi
+   mobile selama employee aktif bekerja.
+
+================================================================
+    END OF DOCUMENTATION - EMPLOYEE API
+================================================================

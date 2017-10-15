@@ -17,8 +17,13 @@ class TaskController extends Controller
         
         if ($user->isAdmin()) {
             $adminId = $user->id;
-            $tasks = Task::with(['employee.user', 'assignedBy'])
-                ->where('admin_id', $adminId)
+            // OPTIMIZATION: Eager load with selected columns only
+            $tasks = Task::with([
+                    'employee.user:id,name,email', 
+                    'assignedBy:id,name,email'
+                ])
+                ->select('id', 'admin_id', 'title', 'description', 'assigned_to', 'assigned_by', 'status', 'priority', 'due_date', 'created_at', 'updated_at')
+                ->forAdmin($adminId)
                 ->orderBy('created_at', 'desc')
                 ->paginate(20);
         } else {
@@ -27,8 +32,10 @@ class TaskController extends Controller
                 return response()->json(['message' => 'Employee profile not found'], 404);
             }
             
-            $tasks = Task::with(['assignedBy'])
-                ->where('assigned_to', $employee->id)
+            // OPTIMIZATION: Use query scope
+            $tasks = Task::with(['assignedBy:id,name,email'])
+                ->select('id', 'admin_id', 'title', 'description', 'assigned_to', 'assigned_by', 'status', 'priority', 'due_date', 'created_at', 'updated_at')
+                ->forEmployee($employee->id)
                 ->orderBy('created_at', 'desc')
                 ->paginate(20);
         }
@@ -153,15 +160,17 @@ class TaskController extends Controller
         $status = $request->query('status');
         $priority = $request->query('priority');
 
-        $query = Task::with(['assignedBy'])
-            ->where('assigned_to', $employee->id);
+        // OPTIMIZATION: Use query scopes
+        $query = Task::with(['assignedBy:id,name,email'])
+            ->select('id', 'admin_id', 'title', 'description', 'assigned_to', 'assigned_by', 'status', 'priority', 'due_date', 'created_at', 'updated_at')
+            ->forEmployee($employee->id);
 
         if ($status) {
             $query->where('status', $status);
         }
 
         if ($priority) {
-            $query->where('priority', $priority);
+            $query->byPriority($priority);
         }
 
         $tasks = $query->orderBy('created_at', 'desc')->paginate(20);

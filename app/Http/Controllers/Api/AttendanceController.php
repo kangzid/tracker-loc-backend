@@ -5,21 +5,33 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\Geofence;
+use App\Services\GeofenceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 class AttendanceController extends Controller
 {
+    protected GeofenceService $geofenceService;
+
+    public function __construct(GeofenceService $geofenceService)
+    {
+        $this->geofenceService = $geofenceService;
+    }
     public function index(Request $request)
     {
         $user = $request->user();
 
         if ($user->isAdmin()) {
             $adminId = $user->id;
-            // Admin can see all attendances from their employees only
-            $attendances = Attendance::with('employee.user')
+            // OPTIMIZATION: Use eager loading to prevent N+1 queries
+            $attendances = Attendance::with(['employee' => function($query) {
+                    $query->select('id', 'user_id', 'admin_id', 'employee_id', 'department', 'position');
+                }, 'employee.user' => function($query) {
+                    $query->select('id', 'name', 'email');
+                }])
                 ->whereHas('employee', function ($q) use ($adminId) {
                     $q->where('admin_id', $adminId);
                 })
@@ -32,7 +44,8 @@ class AttendanceController extends Controller
                 return response()->json(['message' => 'Employee profile not found'], 404);
             }
 
-            $attendances = Attendance::where('employee_id', $employee->id)
+            // OPTIMIZATION: Use query scope
+            $attendances = Attendance::forEmployee($employee->id)
                 ->orderBy('date', 'desc')
                 ->paginate(20);
         }
@@ -57,8 +70,12 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'Employee profile not found'], 404);
         }
 
-        // Check geofencing first BEFORE creating any record in the database
-        $isInOffice = $this->checkGeofencing($request->latitude, $request->longitude, $employee->admin_id);
+        // OPTIMIZATION: Use cached geofence service
+        $isInOffice = $this->geofenceService->isInsideGeofence(
+            $request->latitude, 
+            $request->longitude, 
+            $employee->admin_id
+        );
 
         // Return error if outside office area
         if (!$isInOffice) {
@@ -89,6 +106,9 @@ class AttendanceController extends Controller
                 'check_in_lng' => $request->longitude,
                 'status' => $status
             ]);
+            
+            // Clear today's attendance cache
+            Cache::forget("attendance:today:employee:{$employee->id}:" . Carbon::today()->format('Y-m-d'));
         } else {
             if (!$attendance->check_in) {
                 return response()->json(['message' => 'Must check in first'], 400);
@@ -102,6 +122,9 @@ class AttendanceController extends Controller
                 'check_out_lat' => $request->latitude,
                 'check_out_lng' => $request->longitude,
             ]);
+            
+            // Clear today's attendance cache
+            Cache::forget("attendance:today:employee:{$employee->id}:" . Carbon::today()->format('Y-m-d'));
         }
 
         return response()->json($attendance);
@@ -135,9 +158,14 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'Employee profile not found'], 404);
         }
 
-        $attendance = Attendance::where('employee_id', $employee->id)
-            ->where('date', Carbon::today())
-            ->first();
+        // OPTIMIZATION: Cache today's attendance for 5 minutes
+        $cacheKey = "attendance:today:employee:{$employee->id}:" . Carbon::today()->format('Y-m-d');
+        
+        $attendance = Cache::remember($cacheKey, 300, function () use ($employee) {
+            return Attendance::forEmployee($employee->id)
+                ->today()
+                ->first();
+        });
 
         return response()->json($attendance);
     }
@@ -149,9 +177,9 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'Employee profile not found'], 404);
         }
 
-        $attendances = Attendance::where('employee_id', $employee->id)
-            ->whereMonth('date', Carbon::now()->month)
-            ->whereYear('date', Carbon::now()->year)
+        // OPTIMIZATION: Use query scope
+        $attendances = Attendance::forEmployee($employee->id)
+            ->thisMonth()
             ->orderBy('date', 'desc')
             ->get();
 
@@ -380,7 +408,12 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'Employee profile not found'], 404);
         }
 
-        $isInOffice = $this->checkGeofencing($request->latitude, $request->longitude, $employee->admin_id);
+        // OPTIMIZATION: Use cached geofence service
+        $isInOffice = $this->geofenceService->isInsideGeofence(
+            $request->latitude, 
+            $request->longitude, 
+            $employee->admin_id
+        );
 
         return response()->json([
             'is_in_office' => $isInOffice,
@@ -414,22 +447,7 @@ class AttendanceController extends Controller
         ]);
     }
 
-    private function checkGeofencing($latitude, $longitude, $adminId)
-    {
-        $geofences = Geofence::where('is_active', true)
-            ->where('type', 'office')
-            ->where('admin_id', $adminId)
-            ->get();
 
-        foreach ($geofences as $geofence) {
-            /** @var \App\Models\Geofence $geofence */
-            if ($geofence->isInsideGeofence($latitude, $longitude)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
 
     private function determineAttendanceStatus($isInOffice)
     {

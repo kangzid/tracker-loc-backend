@@ -9,6 +9,7 @@ use App\Models\Vehicle;
 use App\Events\LocationUpdated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 
 class LocationController extends Controller
 {
@@ -41,41 +42,44 @@ class LocationController extends Controller
             $entityName = $trackable->vehicle_number;
         }
 
-        // Update or create latest location (only keep one record per trackable)
-        $location = Location::updateOrCreate(
-            [
-                'trackable_type' => $request->trackable_type === 'employee' ? Employee::class : Vehicle::class,
-                'trackable_id' => $request->trackable_id,
-            ],
-            [
+        // OPTIMIZATION: Use DB transaction for atomic updates
+        DB::transaction(function () use ($request, $trackable, $entityName) {
+            // Update or create latest location (only keep one record per trackable)
+            Location::updateOrCreate(
+                [
+                    'trackable_type' => $request->trackable_type === 'employee' ? Employee::class : Vehicle::class,
+                    'trackable_id' => $request->trackable_id,
+                ],
+                [
+                    'latitude' => $request->latitude,
+                    'longitude' => $request->longitude,
+                    'speed' => $request->speed,
+                    'accuracy' => $request->accuracy,
+                    'recorded_at' => now(),
+                ]
+            );
+
+            // Update last location in trackable model
+            $trackable->update([
                 'latitude' => $request->latitude,
                 'longitude' => $request->longitude,
-                'speed' => $request->speed,
-                'accuracy' => $request->accuracy,
-                'recorded_at' => now(),
-            ]
-        );
+                'last_location_update' => now(),
+            ]);
 
-        // Update last location in trackable model
-        $trackable->update([
-            'latitude' => $request->latitude,
-            'longitude' => $request->longitude,
-            'last_location_update' => now(),
-        ]);
+            // Broadcast location update via WebSocket untuk real-time tracking
+            LocationUpdated::dispatch(
+                $request->trackable_type,
+                $request->trackable_id,
+                $request->latitude,
+                $request->longitude,
+                $request->speed,
+                $request->accuracy,
+                now(),
+                $entityName
+            );
+        });
 
-        // Broadcast location update via WebSocket untuk real-time tracking
-        LocationUpdated::dispatch(
-            $request->trackable_type,
-            $request->trackable_id,
-            $request->latitude,
-            $request->longitude,
-            $request->speed,
-            $request->accuracy,
-            now(),
-            $entityName
-        );
-
-        return response()->json($location, 201);
+        return response()->json(['message' => 'Location updated successfully'], 201);
     }
 
     public function liveTracking(Request $request)
@@ -83,17 +87,19 @@ class LocationController extends Controller
         $user = $request->user();
 
         if ($user->isAdmin()) {
-            // Admin hanya bisa lihat employee & vehicle miliknya sendiri
+            // OPTIMIZATION: Eager load relationships and select only needed columns
             $adminId = $user->id;
 
-            $employees = Employee::with(['user', 'latestLocation'])
+            $employees = Employee::with(['user:id,name,email', 'latestLocation:id,trackable_type,trackable_id,latitude,longitude,recorded_at'])
+                ->select('id', 'user_id', 'admin_id', 'employee_id', 'latitude', 'longitude', 'last_location_update')
                 ->where('admin_id', $adminId)
                 ->whereHas('user', function ($q) {
                     $q->where('is_active', true);
                 })
                 ->get();
 
-            $vehicles = Vehicle::with('latestLocation')
+            $vehicles = Vehicle::with(['latestLocation:id,trackable_type,trackable_id,latitude,longitude,recorded_at'])
+                ->select('id', 'admin_id', 'vehicle_number', 'vehicle_type', 'latitude', 'longitude', 'last_location_update', 'is_active')
                 ->where('admin_id', $adminId)
                 ->where('is_active', true)
                 ->get();
@@ -104,11 +110,13 @@ class LocationController extends Controller
                 return response()->json(['message' => 'Employee profile not found'], 404);
             }
 
-            $employees = Employee::with(['user', 'latestLocation'])
+            $employees = Employee::with(['user:id,name,email', 'latestLocation:id,trackable_type,trackable_id,latitude,longitude,recorded_at'])
+                ->select('id', 'user_id', 'admin_id', 'employee_id', 'latitude', 'longitude', 'last_location_update')
                 ->where('id', $employee->id)
                 ->get();
 
-            $vehicles = Vehicle::with('latestLocation')
+            $vehicles = Vehicle::with(['latestLocation:id,trackable_type,trackable_id,latitude,longitude,recorded_at'])
+                ->select('id', 'admin_id', 'vehicle_number', 'vehicle_type', 'latitude', 'longitude', 'last_location_update', 'is_active')
                 ->where('admin_id', $employee->admin_id)
                 ->where('is_active', true)
                 ->get();
@@ -150,8 +158,9 @@ class LocationController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $query = Location::where('trackable_type', Employee::class)
-            ->where('trackable_id', $employeeId)
+        // OPTIMIZATION: Use query scope and select only needed columns
+        $query = Location::select('id', 'trackable_type', 'trackable_id', 'latitude', 'longitude', 'speed', 'accuracy', 'recorded_at')
+            ->forEmployee($employeeId)
             ->orderBy('recorded_at', 'desc');
 
         if ($request->date) {
@@ -204,8 +213,9 @@ class LocationController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $query = Location::where('trackable_type', Vehicle::class)
-            ->where('trackable_id', $vehicleId)
+        // OPTIMIZATION: Use query scope and select only needed columns
+        $query = Location::select('id', 'trackable_type', 'trackable_id', 'latitude', 'longitude', 'speed', 'accuracy', 'recorded_at')
+            ->forVehicle($vehicleId)
             ->orderBy('recorded_at', 'desc');
 
         if ($request->date) {

@@ -10,6 +10,14 @@ class Notification extends Model
 {
     use HasFactory, SoftDeletes;
 
+    /**
+     * Prepare a date for array / JSON serialization.
+     */
+    protected function serializeDate(\DateTimeInterface $date)
+    {
+        return $date->format('Y-m-d H:i:s');
+    }
+
     protected $fillable = [
         'admin_id',
         'employee_id',

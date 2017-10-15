@@ -14,9 +14,11 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(\Illuminate\Http\Middleware\HandleCors::class);
         $middleware->append(\App\Http\Middleware\EnsureSecurityHeaders::class);
+        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
         $middleware->alias([
             'subscription.quota' => \App\Http\Middleware\CheckSubscription::class,
             'superadmin' => \App\Http\Middleware\EnsureSuperAdmin::class,
+            'rate.limit' => \App\Http\Middleware\CustomRateLimiter::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

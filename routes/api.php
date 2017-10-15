@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\SuperAdminController;
 
 use App\Http\Controllers\Api\GpsTrackingController;
 use App\Http\Controllers\Api\ImageController;
+use App\Http\Controllers\Api\CompanyRegistrationController;
 
 // ============================================================
 // Public routes
@@ -24,6 +25,9 @@ use App\Http\Controllers\Api\ImageController;
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
 Route::get('/shared-location/{token}', [LocationController::class, 'getSharedLocation']);
+
+// Company Registration (Public)
+Route::post('/company/register', [CompanyRegistrationController::class, 'register']);
 
 // Public images (notifications)
 Route::get('/images/notifications/{adminId}/{date}/{filename}', [ImageController::class, 'serveNotificationImage']);
@@ -176,6 +180,18 @@ Route::middleware(['auth:sanctum', 'superadmin'])->prefix('superadmin')->group(f
 
     // Dashboard & statistik platform
     Route::get('/dashboard', [SuperAdminController::class, 'dashboard']);
+
+    // Company Registration Management
+    Route::prefix('registrations')->group(function () {
+        Route::get('/pending', [CompanyRegistrationController::class, 'pending']);
+        Route::get('/approved', [CompanyRegistrationController::class, 'approved']);
+        Route::get('/rejected', [CompanyRegistrationController::class, 'rejected']);
+        Route::get('/statistics', [CompanyRegistrationController::class, 'statistics']);
+        Route::get('/{id}', [CompanyRegistrationController::class, 'show']);
+        Route::post('/{id}/approve', [CompanyRegistrationController::class, 'approve']);
+        Route::post('/{id}/reject', [CompanyRegistrationController::class, 'reject']);
+        Route::delete('/{id}', [CompanyRegistrationController::class, 'destroy']);
+    });
 
     // Manajemen Akun Admin (Tenant)
     Route::get('/admins', [SuperAdminController::class, 'listAdmins']);
