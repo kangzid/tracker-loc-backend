@@ -13,6 +13,7 @@ class ImageController
      */
     public function serveNotificationImage($adminId, $date, $filename)
     {
+        $filename = basename($filename);
         $path = "notifications/{$adminId}/{$date}/{$filename}";
 
         // Check if file exists

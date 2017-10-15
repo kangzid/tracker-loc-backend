@@ -26,14 +26,14 @@ use App\Http\Controllers\Api\SupportChatController;
 // ============================================================
 // Public routes
 // ============================================================
-Route::post('/login', [AuthController::class, 'login']);
-Route::post('/register', [AuthController::class, 'register']);
+Route::post('/login', [AuthController::class, 'login'])->middleware('rate.limit:login');
+Route::post('/register', [AuthController::class, 'register'])->middleware('rate.limit:api');
 Route::get('/shared-location/{token}', [LocationController::class, 'getSharedLocation']);
-Route::post('/company/register', [CompanyRegistrationController::class, 'register']);
+Route::post('/company/register', [CompanyRegistrationController::class, 'register'])->middleware('rate.limit:api');
 Route::get('/images/notifications/{adminId}/{date}/{filename}', [ImageController::class, 'serveNotificationImage']);
-Route::post('/provision', [ProvisionController::class, 'provision']);
+Route::post('/provision', [ProvisionController::class, 'provision'])->middleware('rate.limit:api');
 Route::prefix('gps')->group(function () {
-    Route::post('/track', [GpsTrackingController::class, 'track']);
+    Route::post('/track', [GpsTrackingController::class, 'track'])->middleware('rate.limit:location');
     Route::get('/ping', [GpsTrackingController::class, 'ping']);
     Route::get('/status', [GpsTrackingController::class, 'status']);
 });

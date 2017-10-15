@@ -53,13 +53,14 @@ class ProvisionController extends Controller
 
         try {
             // 1. Buat akun User dengan role=admin
-            $user = User::create([
+            $user = new User([
                 'name'      => $adminName,
                 'email'     => $request->email,
                 'password'  => Hash::make($plainPassword),
-                'role'      => 'admin',
                 'is_active' => true,
             ]);
+            $user->role = 'admin';
+            $user->save();
 
             // 2. Buat subscription trial 30 hari
             $subscription = Subscription::create([

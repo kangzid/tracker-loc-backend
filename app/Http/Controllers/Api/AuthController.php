@@ -74,12 +74,13 @@ class AuthController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $user = User::create([
+        $user = new User([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'role' => $request->role,
         ]);
+        $user->role = $request->role;
+        $user->save();
 
         if ($request->role === 'employee') {
             Employee::create([

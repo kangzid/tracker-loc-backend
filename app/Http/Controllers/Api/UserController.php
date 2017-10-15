@@ -113,18 +113,18 @@ class UserController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $updateData = [
+        $user->fill([
             'name' => $request->name,
             'email' => $request->email,
-            'role' => $request->role,
             'is_active' => $request->is_active ?? true,
-        ];
+        ]);
 
         if ($request->password) {
-            $updateData['password'] = Hash::make($request->password);
+            $user->password = Hash::make($request->password);
         }
 
-        $user->update($updateData);
+        $user->role = $request->role;
+        $user->save();
 
         return response()->json($user);
     }

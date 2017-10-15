@@ -10,7 +10,7 @@ import random
 import json
 
 # Configuration
-API_URL = "https://locatrack.zalfyan.my.id/api/gps"
+API_URL = "http://127.0.0.1:8000/api/gps"
 TRACKING_TOKEN = "5a29b4f206d17e021b57c51cc9c7d8f58b9504c8d36999ed992a40a3939a7b18"  # Ganti dengan token vehicle Anda
 
 # Starting location (Jakarta)

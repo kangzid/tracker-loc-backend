@@ -10,7 +10,6 @@ class Vehicle extends Model
     use HasFactory;
 
     protected $fillable = [
-        'admin_id',
         'vehicle_number',
         'vehicle_type',
         'brand',
@@ -20,7 +19,6 @@ class Vehicle extends Model
         'longitude',
         'last_location_update',
         'is_active',
-        'tracking_token',
         'token_generated_at',
     ];
 
@@ -66,10 +64,10 @@ class Vehicle extends Model
     public function generateTrackingToken(): string
     {
         $token = bin2hex(random_bytes(32)); // 64 character token
-        $this->update([
+        $this->forceFill([
             'tracking_token' => $token,
             'token_generated_at' => now(),
-        ]);
+        ])->save();
         return $token;
     }
 

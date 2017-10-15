@@ -44,10 +44,15 @@ class VehicleController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $vehicle = Vehicle::create(array_merge(
-            $request->all(),
-            ['admin_id' => $request->user()->id]
-        ));
+        $vehicle = new Vehicle($request->only([
+            'vehicle_number',
+            'vehicle_type',
+            'brand',
+            'model',
+            'year',
+        ]));
+        $vehicle->admin_id = $request->user()->id;
+        $vehicle->save();
 
         // Generate tracking token automatically
         $token = $vehicle->generateTrackingToken();
@@ -94,7 +99,14 @@ class VehicleController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $vehicle->update($request->all());
+        $vehicle->update($request->only([
+            'vehicle_number',
+            'vehicle_type',
+            'brand',
+            'model',
+            'year',
+            'is_active',
+        ]));
 
         return response()->json($vehicle);
     }
