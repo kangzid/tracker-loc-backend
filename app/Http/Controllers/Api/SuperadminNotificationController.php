@@ -36,13 +36,13 @@ class SuperadminNotificationController extends Controller
             $image = $request->file('image');
             $path = "notifications/{$request->user()->id}/" . now()->format('Y-m-d');
             $filename = time() . '.' . $image->getClientOriginalExtension();
-            
+
             Storage::disk('public')->putFileAs($path, $image, $filename);
             $imageUrl = "notifications/{$request->user()->id}/" . now()->format('Y-m-d') . "/{$filename}";
         }
 
         // Determine recipient admin IDs
-        $recipientAdminIds = $request->recipient_type === 'all' 
+        $recipientAdminIds = $request->recipient_type === 'all'
             ? \App\Models\User::where('role', 'admin')->pluck('id')->toArray()
             : $request->admin_ids;
 
@@ -121,7 +121,7 @@ class SuperadminNotificationController extends Controller
         }
 
         $notification->load(['adminStatus']);
-        
+
         // Add full image URL
         if ($notification->image_url) {
             $parts = explode('/', $notification->image_url);

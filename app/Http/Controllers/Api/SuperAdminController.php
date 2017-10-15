@@ -30,28 +30,28 @@ class SuperAdminController extends Controller
      */
     public function dashboard()
     {
-        $totalAdmins       = User::where('role', 'admin')->count();
-        $activeAdmins      = User::where('role', 'admin')->where('is_active', true)->count();
-        $totalEmployees    = Employee::count();
-        $totalVehicles     = Vehicle::count();
-        $activeSubs        = Subscription::where('status', 'active')->whereDate('expired_at', '>=', now())->count();
-        $expiredSubs       = Subscription::where('status', 'expired')
+        $totalAdmins = User::where('role', 'admin')->count();
+        $activeAdmins = User::where('role', 'admin')->where('is_active', true)->count();
+        $totalEmployees = Employee::count();
+        $totalVehicles = Vehicle::count();
+        $activeSubs = Subscription::where('status', 'active')->whereDate('expired_at', '>=', now())->count();
+        $expiredSubs = Subscription::where('status', 'expired')
             ->orWhere(function ($q) {
                 $q->where('status', 'active')->whereDate('expired_at', '<', now());
             })->count();
-        $trialSubs         = Subscription::where('plan', 'trial')->where('status', 'active')->count();
+        $trialSubs = Subscription::where('plan', 'trial')->where('status', 'active')->count();
 
         return response()->json([
             'summary' => [
-                'total_admins'      => $totalAdmins,
-                'active_admins'     => $activeAdmins,
-                'total_employees'   => $totalEmployees,
-                'total_vehicles'    => $totalVehicles,
+                'total_admins' => $totalAdmins,
+                'active_admins' => $activeAdmins,
+                'total_employees' => $totalEmployees,
+                'total_vehicles' => $totalVehicles,
             ],
             'subscriptions' => [
-                'active'  => $activeSubs,
+                'active' => $activeSubs,
                 'expired' => $expiredSubs,
-                'trial'   => $trialSubs,
+                'trial' => $trialSubs,
             ],
         ]);
     }
@@ -67,12 +67,14 @@ class SuperAdminController extends Controller
     public function listAdmins(Request $request)
     {
         $perPage = $request->query('per_page', 15);
-        $search  = $request->query('search');
+        $search = $request->query('search');
 
         $query = User::where('role', 'admin')
-            ->with(['subscription' => function ($q) {
-                $q->latest();
-            }]);
+            ->with([
+                'subscription' => function ($q) {
+                    $q->latest();
+                }
+            ]);
 
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -87,11 +89,11 @@ class SuperAdminController extends Controller
         $admins->getCollection()->transform(function ($admin) {
             $sub = $admin->subscription;
             $admin->subscription_status = $sub ? [
-                'plan'           => $sub->plan,
-                'status'         => $sub->status,
-                'expired_at'     => $sub->expired_at?->toDateTimeString(),
+                'plan' => $sub->plan,
+                'status' => $sub->status,
+                'expired_at' => $sub->expired_at?->toDateTimeString(),
                 'days_remaining' => $sub->daysRemaining(),
-                'is_active'      => $sub->isActive(),
+                'is_active' => $sub->isActive(),
             ] : null;
             return $admin;
         });
@@ -114,19 +116,19 @@ class SuperAdminController extends Controller
         $sub = $admin->subscription;
 
         return response()->json([
-            'admin'        => $admin,
+            'admin' => $admin,
             'subscription' => $sub ? [
-                'id'              => $sub->id,
-                'plan'            => $sub->plan,
-                'status'          => $sub->status,
-                'company_name'    => $sub->company_name,
-                'contact_phone'   => $sub->contact_phone,
-                'max_employees'   => $sub->max_employees,
-                'max_vehicles'    => $sub->max_vehicles,
-                'started_at'      => $sub->started_at->toDateTimeString(),
-                'expired_at'      => $sub->expired_at->toDateTimeString(),
-                'days_remaining'  => $sub->daysRemaining(),
-                'is_active'       => $sub->isActive(),
+                'id' => $sub->id,
+                'plan' => $sub->plan,
+                'status' => $sub->status,
+                'company_name' => $sub->company_name,
+                'contact_phone' => $sub->contact_phone,
+                'max_employees' => $sub->max_employees,
+                'max_vehicles' => $sub->max_vehicles,
+                'started_at' => $sub->started_at->toDateTimeString(),
+                'expired_at' => $sub->expired_at->toDateTimeString(),
+                'days_remaining' => $sub->daysRemaining(),
+                'is_active' => $sub->isActive(),
             ] : null,
         ]);
     }
@@ -138,12 +140,12 @@ class SuperAdminController extends Controller
     public function createAdmin(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'company_name'  => 'required|string|max:255',
-            'email'         => 'required|email|unique:users,email',
+            'company_name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
             'contact_phone' => 'nullable|string|max:20',
-            'plan'          => 'required|in:trial,monthly,yearly',
+            'plan' => 'required|in:trial,monthly,yearly',
             'max_employees' => 'required|integer|min:1',
-            'max_vehicles'  => 'required|integer|min:1',
+            'max_vehicles' => 'required|integer|min:1',
             'duration_days' => 'required|integer|min:1',
         ]);
 
@@ -154,31 +156,31 @@ class SuperAdminController extends Controller
         $plainPassword = Str::password(12, letters: true, numbers: true, symbols: false, spaces: false);
 
         $user = User::create([
-            'name'      => 'Admin ' . $request->company_name,
-            'email'     => $request->email,
-            'password'  => Hash::make($plainPassword),
-            'role'      => 'admin',
+            'name' => 'Admin ' . $request->company_name,
+            'email' => $request->email,
+            'password' => Hash::make($plainPassword),
+            'role' => 'admin',
             'is_active' => true,
         ]);
 
         $subscription = Subscription::create([
-            'user_id'       => $user->id,
-            'plan'          => $request->plan,
+            'user_id' => $user->id,
+            'plan' => $request->plan,
             'max_employees' => $request->max_employees,
-            'max_vehicles'  => $request->max_vehicles,
-            'company_name'  => $request->company_name,
+            'max_vehicles' => $request->max_vehicles,
+            'company_name' => $request->company_name,
             'contact_phone' => $request->contact_phone,
-            'started_at'    => now(),
-            'expired_at'    => now()->addDays($request->duration_days),
-            'status'        => 'active',
+            'started_at' => now(),
+            'expired_at' => now()->addDays($request->duration_days),
+            'status' => 'active',
         ]);
 
         return response()->json([
-            'message'      => 'Akun Admin berhasil dibuat.',
-            'admin'        => $user,
+            'message' => 'Akun Admin berhasil dibuat.',
+            'admin' => $user,
             'subscription' => $subscription,
-            'credentials'  => [
-                'email'    => $user->email,
+            'credentials' => [
+                'email' => $user->email,
                 'password' => $plainPassword,
             ],
         ], 201);
@@ -199,9 +201,9 @@ class SuperAdminController extends Controller
         $admin->update(['is_active' => !$admin->is_active]);
 
         return response()->json([
-            'message'   => 'Status akun berhasil diperbarui.',
+            'message' => 'Status akun berhasil diperbarui.',
             'is_active' => $admin->is_active,
-            'admin'     => $admin,
+            'admin' => $admin,
         ]);
     }
 
@@ -251,7 +253,7 @@ class SuperAdminController extends Controller
         }
 
         $adminEmail = $admin->email;
-        
+
         try {
             // Get all employees of this admin for cascade delete
             $employees = Employee::where('admin_id', $admin->id)->get();
@@ -262,21 +264,21 @@ class SuperAdminController extends Controller
             if (!empty($employeeIds)) {
                 // Delete attendance records (employee_id column)
                 \App\Models\Attendance::whereIn('employee_id', $employeeIds)->delete();
-                
+
                 // Delete tasks (assigned_to column references employees)
                 \App\Models\Task::whereIn('assigned_to', $employeeIds)->delete();
-                
+
                 // Delete locations (polymorphic: trackable_id + trackable_type)
                 \App\Models\Location::where('trackable_type', 'App\Models\Employee')
                     ->whereIn('trackable_id', $employeeIds)
                     ->delete();
-                
+
                 // Delete notifications (employee_id column)
                 \App\Models\Notification::whereIn('employee_id', $employeeIds)->delete();
-                
+
                 // Delete employees
                 Employee::whereIn('id', $employeeIds)->delete();
-                
+
                 // Delete user accounts of these employees
                 if (!empty($employeeUserIds)) {
                     User::whereIn('id', $employeeUserIds)->where('role', 'employee')->delete();
@@ -293,19 +295,19 @@ class SuperAdminController extends Controller
                     ->delete();
             }
             Vehicle::where('admin_id', $admin->id)->delete();
-            
+
             // Delete geofences
             \App\Models\Geofence::where('admin_id', $admin->id)->delete();
-            
+
             // Delete notifications created by this admin (broadcast)
             \App\Models\Notification::where('created_by', $admin->id)->delete();
-            
+
             // Delete admin notification status
             \App\Models\AdminNotificationStatus::where('admin_id', $admin->id)->delete();
-            
+
             // Delete subscription (use user_id since subscription is tied to users)
             Subscription::where('user_id', $admin->id)->delete();
-            
+
             // Delete the admin user itself
             $admin->delete();
 
@@ -330,7 +332,7 @@ class SuperAdminController extends Controller
      */
     public function listSubscriptions(Request $request)
     {
-        $status  = $request->query('status');  // active, expired, cancelled
+        $status = $request->query('status');  // active, expired, cancelled
         $perPage = $request->query('per_page', 15);
 
         $query = Subscription::with('user');
@@ -357,11 +359,11 @@ class SuperAdminController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'plan'          => 'sometimes|in:trial,monthly,yearly',
+            'plan' => 'sometimes|in:trial,monthly,yearly',
             'max_employees' => 'sometimes|integer|min:1',
-            'max_vehicles'  => 'sometimes|integer|min:1',
-            'expired_at'    => 'sometimes|date|after:now',
-            'status'        => 'sometimes|in:active,expired,cancelled',
+            'max_vehicles' => 'sometimes|integer|min:1',
+            'expired_at' => 'sometimes|date|after:now',
+            'status' => 'sometimes|in:active,expired,cancelled',
         ]);
 
         if ($validator->fails()) {
@@ -371,7 +373,7 @@ class SuperAdminController extends Controller
         $subscription->update($request->only(['plan', 'max_employees', 'max_vehicles', 'expired_at', 'status']));
 
         return response()->json([
-            'message'      => 'Subscription berhasil diperbarui.',
+            'message' => 'Subscription berhasil diperbarui.',
             'subscription' => $subscription->fresh(),
         ]);
     }
@@ -402,11 +404,11 @@ class SuperAdminController extends Controller
 
         $subscription->update([
             'expired_at' => $newExpiry,
-            'status'     => 'active',
+            'status' => 'active',
         ]);
 
         return response()->json([
-            'message'        => "Subscription diperpanjang {$request->days} hari.",
+            'message' => "Subscription diperpanjang {$request->days} hari.",
             'new_expired_at' => $subscription->fresh()->expired_at->toDateTimeString(),
             'days_remaining' => $subscription->fresh()->daysRemaining(),
         ]);

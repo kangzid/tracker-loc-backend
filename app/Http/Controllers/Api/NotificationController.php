@@ -90,9 +90,11 @@ class NotificationController extends Controller
         // Get all notifications for this admin (not soft deleted)
         $notifications = AdminNotificationStatus::where('admin_id', $adminId)
             ->whereNull('deleted_by_admin_at')
-            ->with(['notification' => function ($query) {
-                $query->withTrashed()->select('id', 'created_by', 'title', 'message', 'image_url', 'type', 'recipient_type', 'created_at');
-            }])
+            ->with([
+                'notification' => function ($query) {
+                    $query->withTrashed()->select('id', 'created_by', 'title', 'message', 'image_url', 'type', 'recipient_type', 'created_at');
+                }
+            ])
             ->orderByDesc('created_at')
             ->paginate(20);
 

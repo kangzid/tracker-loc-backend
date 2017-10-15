@@ -14,7 +14,7 @@ class ImageController
     public function serveNotificationImage($adminId, $date, $filename)
     {
         $path = "notifications/{$adminId}/{$date}/{$filename}";
-        
+
         // Check if file exists
         if (!Storage::disk('public')->exists($path)) {
             return response()->json(['message' => 'Image not found'], 404);
