@@ -236,7 +236,11 @@ class SuperAdminController extends Controller
 
     /**
      * DELETE /api/superadmin/admins/{id}
-     * Hapus akun Admin beserta subscription-nya secara permanen.
+     * Hapus akun Admin beserta SEMUA data terkait secara permanen:
+     * - Subscription
+     * - Employees (cascade akan hapus attendance, tasks, locations, dll)
+     * - Vehicles
+     * - Notifications
      */
     public function deleteAdmin($id)
     {
@@ -246,14 +250,74 @@ class SuperAdminController extends Controller
             return response()->json(['message' => 'Admin tidak ditemukan.'], 404);
         }
 
-        // Hapus subscription terkait (cascade via DB sudah ada, ini sebagai konfirmasi)
-        Subscription::where('user_id', $admin->id)->delete();
         $adminEmail = $admin->email;
-        $admin->delete();
+        
+        try {
+            // Get all employees of this admin for cascade delete
+            $employees = Employee::where('admin_id', $admin->id)->get();
+            $employeeIds = $employees->pluck('id')->toArray();
+            $employeeUserIds = $employees->pluck('user_id')->filter()->toArray(); // Get user IDs
 
-        return response()->json([
-            'message' => "Akun Admin ({$adminEmail}) dan semua data subscription-nya berhasil dihapus.",
-        ]);
+            // Cascade delete untuk semua employees
+            if (!empty($employeeIds)) {
+                // Delete attendance records (employee_id column)
+                \App\Models\Attendance::whereIn('employee_id', $employeeIds)->delete();
+                
+                // Delete tasks (assigned_to column references employees)
+                \App\Models\Task::whereIn('assigned_to', $employeeIds)->delete();
+                
+                // Delete locations (polymorphic: trackable_id + trackable_type)
+                \App\Models\Location::where('trackable_type', 'App\Models\Employee')
+                    ->whereIn('trackable_id', $employeeIds)
+                    ->delete();
+                
+                // Delete notifications (employee_id column)
+                \App\Models\Notification::whereIn('employee_id', $employeeIds)->delete();
+                
+                // Delete employees
+                Employee::whereIn('id', $employeeIds)->delete();
+                
+                // Delete user accounts of these employees
+                if (!empty($employeeUserIds)) {
+                    User::whereIn('id', $employeeUserIds)->where('role', 'employee')->delete();
+                }
+            }
+
+            // Delete vehicles (use admin_id, not user_id)
+            // Also delete vehicle locations (polymorphic)
+            $vehicles = Vehicle::where('admin_id', $admin->id)->get();
+            $vehicleIds = $vehicles->pluck('id')->toArray();
+            if (!empty($vehicleIds)) {
+                \App\Models\Location::where('trackable_type', 'App\Models\Vehicle')
+                    ->whereIn('trackable_id', $vehicleIds)
+                    ->delete();
+            }
+            Vehicle::where('admin_id', $admin->id)->delete();
+            
+            // Delete geofences
+            \App\Models\Geofence::where('admin_id', $admin->id)->delete();
+            
+            // Delete notifications created by this admin (broadcast)
+            \App\Models\Notification::where('created_by', $admin->id)->delete();
+            
+            // Delete admin notification status
+            \App\Models\AdminNotificationStatus::where('admin_id', $admin->id)->delete();
+            
+            // Delete subscription (use user_id since subscription is tied to users)
+            Subscription::where('user_id', $admin->id)->delete();
+            
+            // Delete the admin user itself
+            $admin->delete();
+
+            return response()->json([
+                'message' => "Akun Admin ({$adminEmail}) dan SEMUA data terkait berhasil dihapus (Employees: " . count($employeeIds) . " + User accounts: " . count($employeeUserIds) . ", Vehicles: " . count($vehicleIds) . ", Subscriptions, Notifications, dll).",
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error saat menghapus admin',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     // ===========================================================
