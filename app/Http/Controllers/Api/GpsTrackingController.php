@@ -57,22 +57,49 @@ class GpsTrackingController extends Controller
             ], 422);
         }
 
+        // OPTIMIZATION: Distance-Based Filtering
+        $latestLocation = Location::where('trackable_type', Vehicle::class)
+            ->where('trackable_id', $vehicle->id)
+            ->orderBy('recorded_at', 'desc')
+            ->first();
+
+        $shouldCreateNewRow = true;
+
+        if ($latestLocation) {
+            $distance = $this->calculateDistance(
+                $latestLocation->latitude, $latestLocation->longitude,
+                $request->latitude, $request->longitude
+            );
+
+            // Jika jarak kurang dari 50 meter (diam/tidak bergerak signifikan)
+            if ($distance < 50) {
+                $latestLocation->update([
+                    'recorded_at' => now(), // Update waktu saja
+                    'speed' => $request->speed,
+                    'accuracy' => $request->accuracy
+                ]);
+                $shouldCreateNewRow = false;
+            }
+        }
+
+        // Jika ada pergerakan signifikan, baru buat baris baru
+        if ($shouldCreateNewRow) {
+            Location::create([
+                'trackable_type' => Vehicle::class,
+                'trackable_id' => $vehicle->id,
+                'latitude' => $request->latitude,
+                'longitude' => $request->longitude,
+                'speed' => $request->speed,
+                'accuracy' => $request->accuracy,
+                'recorded_at' => now(),
+            ]);
+        }
+
         // Update vehicle location
         $vehicle->update([
             'latitude' => $request->latitude,
             'longitude' => $request->longitude,
             'last_location_update' => now(),
-        ]);
-
-        // Save to location history
-        $location = Location::create([
-            'trackable_type' => Vehicle::class,
-            'trackable_id' => $vehicle->id,
-            'latitude' => $request->latitude,
-            'longitude' => $request->longitude,
-            'speed' => $request->speed,
-            'accuracy' => $request->accuracy,
-            'recorded_at' => now(),
         ]);
 
         // Broadcast real-time update to Pusher
@@ -184,5 +211,19 @@ class GpsTrackingController extends Controller
                 'latest_tracking' => $vehicle->latestLocation,
             ]
         ], 200);
+    }
+
+    private function calculateDistance($lat1, $lon1, $lat2, $lon2)
+    {
+        $earthRadius = 6371000; // Meter
+        $latDelta = deg2rad($lat2 - $lat1);
+        $lonDelta = deg2rad($lon2 - $lon1);
+
+        $a = sin($latDelta / 2) * sin($latDelta / 2) +
+             cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
+             sin($lonDelta / 2) * sin($lonDelta / 2);
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+
+        return $earthRadius * $c; // Jarak dalam meter
     }
 }

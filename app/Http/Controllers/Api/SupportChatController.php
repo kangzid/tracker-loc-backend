@@ -26,11 +26,11 @@ class SupportChatController extends Controller
                 ->latest()
                 ->get()
                 ->groupBy(function ($msg) use ($user) {
-                    return $msg->sender_id === $user->id ? $msg->receiver_id : $msg->sender_id;
+                    return $msg->sender_id == $user->id ? $msg->receiver_id : $msg->sender_id;
                 })
                 ->map(function ($group) {
                     $lastMessage = $group->first();
-                    $otherUser = $lastMessage->sender_id === Auth::id() ? $lastMessage->receiver : $lastMessage->sender;
+                    $otherUser = $lastMessage->sender_id == \Illuminate\Support\Facades\Auth::id() ? $lastMessage->receiver : $lastMessage->sender;
                     
                     // Fallback if user is deleted
                     if (!$otherUser) {

@@ -89,7 +89,10 @@ class AttendanceController extends Controller
         $today = Carbon::today();
         $attendance = Attendance::firstOrCreate(
             ['employee_id' => $employee->id, 'date' => $today],
-            ['status' => 'present']
+            [
+                'admin_id' => $employee->admin_id,
+                'status' => 'present',
+            ]
         );
 
         if ($request->type === 'check_in') {
@@ -259,7 +262,7 @@ class AttendanceController extends Controller
         $attendance = Attendance::findOrFail($id);
 
         // Verify admin owns this attendance (via employee ownership)
-        if ($attendance->employee->admin_id !== $request->user()->id) {
+        if ($attendance->employee->admin_id != $request->user()->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -285,11 +288,11 @@ class AttendanceController extends Controller
         ];
 
         if ($request->check_in) {
-            $updateData['check_in'] = Carbon::parse($attendance->date . ' ' . $request->check_in);
+            $updateData['check_in'] = Carbon::parse(Carbon::parse($attendance->date)->format('Y-m-d') . ' ' . $request->check_in);
         }
 
         if ($request->check_out) {
-            $updateData['check_out'] = Carbon::parse($attendance->date . ' ' . $request->check_out);
+            $updateData['check_out'] = Carbon::parse(Carbon::parse($attendance->date)->format('Y-m-d') . ' ' . $request->check_out);
         }
 
         $attendance->update($updateData);
@@ -306,7 +309,7 @@ class AttendanceController extends Controller
         $attendance = Attendance::findOrFail($id);
 
         // Verify admin owns this attendance (via employee ownership)
-        if ($attendance->employee->admin_id !== $request->user()->id) {
+        if ($attendance->employee->admin_id != $request->user()->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -368,6 +371,7 @@ class AttendanceController extends Controller
         }
 
         $attendanceData = [
+            'admin_id' => $adminId,
             'employee_id' => $request->employee_id,
             'date' => $request->date,
             'status' => $request->status,

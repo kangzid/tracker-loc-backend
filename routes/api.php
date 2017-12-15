@@ -125,6 +125,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/admins', [UserController::class, 'admins']);
     Route::apiResource('users', UserController::class);
 
+    Route::get('/employee/dashboard', [\App\Http\Controllers\Api\EmployeeDashboardController::class, 'index']);
+
     // Support Chat Routes
     Route::get('/support/messages', [SupportChatController::class, 'index']);
     Route::get('/support/messages/{userId}', [SupportChatController::class, 'show']);

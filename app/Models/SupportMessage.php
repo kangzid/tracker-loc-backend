@@ -20,6 +20,8 @@ class SupportMessage extends Model
 
     protected $casts = [
         'is_read' => 'boolean',
+        'sender_id' => 'integer',
+        'receiver_id' => 'integer',
         'sender_deleted_at' => 'datetime',
         'receiver_deleted_at' => 'datetime',
     ];

@@ -189,14 +189,14 @@ class CompanyRegistrationController extends Controller
      */
     protected function generateWhatsAppTemplate(string $companyName, string $email, string $password): string
     {
-        $appUrl = config('app.url');
+        $frontendUrl = config('app.frontend_url', 'https://locatrack.zalfyan.my.id');
         
         return "Halo {$companyName},\n\n" .
                "Akun LocaTrack Anda sudah aktif!\n\n" .
-               "🔐 Kredensial Login:\n" .
+               "Kredensial Login:\n" .
                "Email: {$email}\n" .
                "Password: {$password}\n" .
-               "Link: {$appUrl}/login\n\n" .
+               "Link: {$frontendUrl}/login\n\n" .
                "Silakan login dan ganti password Anda.\n" .
                "Butuh bantuan? Reply chat ini.";
     }

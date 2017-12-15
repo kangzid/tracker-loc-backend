@@ -44,8 +44,12 @@ class AIController extends Controller
                 return $this->listVehicles($request, $user->id);
             case 'check_attendance':
                 return $this->checkAttendance($request, $user->id);
+            case 'update_attendance':
+                return $this->updateAttendance($request, $user->id);
             case 'get_analytics':
                 return $this->getAnalytics($request, $user->id);
+            case 'check_tasks':
+                return $this->checkTasks($request, $user->id);
             default:
                 return response()->json(['error' => 'Action tidak valid'], 400);
         }
@@ -82,7 +86,7 @@ class AIController extends Controller
     private function listEmployees(Request $request, $adminId)
     {
         $name = $request->query('name');
-        $query = Employee::where('admin_id', $adminId)->with('user');
+        $query = Employee::where('admin_id', $adminId)->with('user:id,name,is_active');
 
         if ($name) {
             $query->whereHas('user', function ($q) use ($name) {
@@ -90,18 +94,27 @@ class AIController extends Controller
             });
         }
 
-        $employees = $query->limit(10)->get()->map(function ($emp) {
+        $totalCount = $query->count();
+
+        $employees = $query->select('id', 'user_id', 'employee_id', 'department', 'position', 'latitude', 'longitude')
+            ->limit(10)
+            ->get()
+            ->map(function ($emp) {
             return [
-                'name' => $emp->user->name ?? 'Unknown',
+                'name' => $emp->user?->name ?? 'Unknown',
                 'id' => $emp->employee_id,
                 'department' => $emp->department,
                 'position' => $emp->position,
-                'status' => ($emp->user->is_active ?? false) ? 'Aktif' : 'Nonaktif',
+                'status' => ($emp->user?->is_active ?? false) ? 'Aktif' : 'Nonaktif',
                 'last_location' => $emp->latitude ? "{$emp->latitude}, {$emp->longitude}" : 'Belum ada data'
             ];
         });
 
-        return response()->json($employees);
+        return response()->json([
+            'total_karyawan' => $totalCount,
+            'menampilkan_maksimal' => 10,
+            'data' => $employees
+        ]);
     }
 
     private function listVehicles(Request $request, $adminId)
@@ -117,7 +130,12 @@ class AIController extends Controller
             });
         }
 
-        $vehicles = $query->limit(10)->get()->map(function ($v) {
+        $totalCount = $query->count();
+
+        $vehicles = $query->select('id', 'vehicle_number', 'vehicle_type', 'brand', 'model', 'is_active', 'latitude', 'longitude')
+            ->limit(10)
+            ->get()
+            ->map(function ($v) {
             return [
                 'plate' => $v->vehicle_number,
                 'type' => $v->vehicle_type,
@@ -127,7 +145,11 @@ class AIController extends Controller
             ];
         });
 
-        return response()->json($vehicles);
+        return response()->json([
+            'total_kendaraan' => $totalCount,
+            'menampilkan_maksimal' => 10,
+            'data' => $vehicles
+        ]);
     }
 
     private function checkAttendance(Request $request, $adminId)
@@ -138,24 +160,29 @@ class AIController extends Controller
         $employee = Employee::where('admin_id', $adminId)
             ->whereHas('user', function ($q) use ($name) {
                 $q->where('name', 'like', "%{$name}%");
-            })->first();
+            })
+            ->with('user:id,name')
+            ->select('id', 'user_id')
+            ->first();
 
         if (!$employee) return response()->json(['error' => 'Karyawan tidak ditemukan'], 404);
 
         $attendance = Attendance::where('employee_id', $employee->id)
             ->whereDate('date', Carbon::today())
+            ->select('id', 'employee_id', 'status', 'check_in', 'check_out', 'notes')
             ->first();
 
         if (!$attendance) {
+            $empName = $employee->user?->name ?? 'Unknown';
             return response()->json([
-                'name' => $employee->user->name,
+                'name' => $empName,
                 'status' => 'Belum Absen',
-                'message' => "Hingga saat ini, {$employee->user->name} belum melakukan absensi masuk."
+                'message' => "Hingga saat ini, {$empName} belum melakukan absensi masuk."
             ]);
         }
 
         return response()->json([
-            'name' => $employee->user->name,
+            'name' => $employee->user?->name ?? 'Unknown',
             'status' => $attendance->status,
             'check_in' => $attendance->check_in ? $attendance->check_in->format('H:i') : '-',
             'check_out' => $attendance->check_out ? $attendance->check_out->format('H:i') : 'Belum pulang',
@@ -187,7 +214,7 @@ class AIController extends Controller
                 ->count();
 
             return response()->json([
-                'subject' => $employee->user->name,
+                'subject' => $employee->user?->name ?? 'Unknown',
                 'period' => "{$months} bulan terakhir",
                 'total_absensi' => $totalAttendances,
                 'tugas_selesai' => $tasksCompleted,
@@ -211,5 +238,85 @@ class AIController extends Controller
         }
 
         return response()->json(['error' => 'Tipe analytics tidak valid'], 400);
+    }
+
+    private function checkTasks(Request $request, $adminId)
+    {
+        $name = $request->query('name');
+        if (!$name) return response()->json(['error' => 'Nama karyawan diperlukan'], 400);
+
+        $employee = Employee::where('admin_id', $adminId)
+            ->whereHas('user', function ($q) use ($name) {
+                $q->where('name', 'like', "%{$name}%");
+            })
+            ->with('user:id,name')
+            ->select('id', 'user_id')
+            ->first();
+
+        if (!$employee) return response()->json(['error' => 'Karyawan tidak ditemukan'], 404);
+
+        $tasks = Task::where('assigned_to', $employee->id)
+            ->whereIn('status', ['pending', 'in_progress'])
+            ->select('id', 'title', 'status', 'priority', 'due_date')
+            ->latest()
+            ->limit(5)
+            ->get();
+
+        if ($tasks->isEmpty()) {
+            return response()->json([
+                'name' => $employee->user?->name ?? 'Unknown',
+                'message' => 'Tidak ada tugas yang sedang berjalan atau pending untuk karyawan ini.'
+            ]);
+        }
+
+        $taskList = $tasks->map(function ($task) {
+            return [
+                'title' => $task->title,
+                'status' => $task->status,
+                'priority' => $task->priority ?? 'normal',
+                'due_date' => $task->due_date ? Carbon::parse($task->due_date)->format('d M Y') : 'Tanpa tenggat waktu'
+            ];
+        });
+
+        return response()->json([
+            'name' => $employee->user?->name ?? 'Unknown',
+            'total_tugas_aktif' => $tasks->count(),
+            'data' => $taskList
+        ]);
+    }
+    private function updateAttendance(Request $request, $adminId)
+    {
+        $name = $request->query('name');
+        $status = $request->query('status'); // 'present' or 'absent'
+
+        if (!$name || !$status) return response()->json(['error' => 'Nama dan status diperlukan'], 400);
+        if (!in_array($status, ['present', 'absent'])) return response()->json(['error' => 'Status tidak valid'], 400);
+
+        $employee = Employee::where('admin_id', $adminId)
+            ->whereHas('user', function ($q) use ($name) {
+                $q->where('name', 'like', "%{$name}%");
+            })
+            ->with('user:id,name')
+            ->select('id', 'user_id', 'admin_id')
+            ->first();
+
+        if (!$employee) return response()->json(['error' => 'Karyawan tidak ditemukan'], 404);
+
+        $attendance = Attendance::firstOrCreate(
+            ['employee_id' => $employee->id, 'date' => Carbon::today()],
+            ['admin_id' => $adminId]
+        );
+
+        $attendance->status = $status;
+        if ($status === 'present' && !$attendance->check_in) {
+            $attendance->check_in = Carbon::now()->format('H:i:00');
+        }
+        $attendance->save();
+
+        return response()->json([
+            'success' => true,
+            'name' => $employee->user?->name ?? 'Unknown',
+            'message' => "Status absensi " . ($employee->user?->name ?? 'karyawan') . " hari ini telah diubah menjadi " . ($status == 'present' ? 'Hadir (Present)' : 'Absent')
+        ]);
     }
 }

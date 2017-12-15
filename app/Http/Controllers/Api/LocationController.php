@@ -51,20 +51,45 @@ class LocationController extends Controller
 
         // OPTIMIZATION: Use DB transaction for atomic updates
         DB::transaction(function () use ($request, $trackable, $entityName) {
-            // Update or create latest location (only keep one record per trackable)
-            Location::updateOrCreate(
-                [
-                    'trackable_type' => $request->trackable_type === 'employee' ? Employee::class : Vehicle::class,
+            $trackableType = $request->trackable_type === 'employee' ? Employee::class : Vehicle::class;
+            
+            // 1. Dapatkan lokasi terakhir dari database
+            $latestLocation = Location::where('trackable_type', $trackableType)
+                ->where('trackable_id', $request->trackable_id)
+                ->orderBy('recorded_at', 'desc')
+                ->first();
+
+            $shouldCreateNewRow = true;
+
+            if ($latestLocation) {
+                $distance = $this->calculateDistance(
+                    $latestLocation->latitude, $latestLocation->longitude,
+                    $request->latitude, $request->longitude
+                );
+
+                // Jika jarak kurang dari 50 meter (diam/tidak bergerak signifikan)
+                if ($distance < 50) {
+                    $latestLocation->update([
+                        'recorded_at' => now(), // Update waktu saja
+                        'speed' => $request->speed,
+                        'accuracy' => $request->accuracy
+                    ]);
+                    $shouldCreateNewRow = false;
+                }
+            }
+
+            // 2. Jika ada pergerakan signifikan, baru buat baris baru untuk history
+            if ($shouldCreateNewRow) {
+                Location::create([
+                    'trackable_type' => $trackableType,
                     'trackable_id' => $request->trackable_id,
-                ],
-                [
                     'latitude' => $request->latitude,
                     'longitude' => $request->longitude,
                     'speed' => $request->speed,
                     'accuracy' => $request->accuracy,
                     'recorded_at' => now(),
-                ]
-            );
+                ]);
+            }
 
             // Update last location in trackable model
             $trackable->update([
@@ -173,12 +198,20 @@ class LocationController extends Controller
         if ($request->date) {
             $query->whereDate('recorded_at', $request->date);
         } elseif ($request->start_date && $request->end_date) {
-            $query->whereBetween('recorded_at', [$request->start_date, $request->end_date]);
+            $query->whereBetween('recorded_at', [
+                $request->start_date . ' 00:00:00', 
+                $request->end_date . ' 23:59:59'
+            ]);
         }
 
-        $locations = $query->paginate(100);
+        $locations = $query->get();
 
-        return response()->json($locations);
+        // OPTIMIZATION: Downsampling (Pilar 3) - Batasi maksimal 20 titik agar memori browser web Svelte aman
+        $downsampledLocations = $this->downsampleLocations($locations, 20);
+
+        return response()->json([
+            'data' => $downsampledLocations->values()
+        ]);
     }
 
     public function vehicleHistory(Request $request, $vehicleId)
@@ -228,39 +261,58 @@ class LocationController extends Controller
         if ($request->date) {
             $query->whereDate('recorded_at', $request->date);
         } elseif ($request->start_date && $request->end_date) {
-            $query->whereBetween('recorded_at', [$request->start_date, $request->end_date]);
+            $query->whereBetween('recorded_at', [
+                $request->start_date . ' 00:00:00', 
+                $request->end_date . ' 23:59:59'
+            ]);
         }
 
-        $locations = $query->paginate(100);
+        $locations = $query->get();
 
-        return response()->json($locations);
+        // OPTIMIZATION: Downsampling (Pilar 3) - Batasi maksimal 20 titik agar memori browser web Svelte aman
+        $downsampledLocations = $this->downsampleLocations($locations, 20);
+
+        return response()->json([
+            'data' => $downsampledLocations->values()
+        ]);
     }
 
     public function shareLocation(Request $request)
     {
+        $employee = $request->user()->employee;
+        if (!$employee) {
+            return response()->json(['message' => 'Employee profile not found'], 404);
+        }
+
         $validator = Validator::make($request->all(), [
-            'latitude' => 'required|numeric',
-            'longitude' => 'required|numeric',
-            'duration' => 'required|integer|min:1|max:1440', // max 24 hours
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
+            'duration' => 'nullable|integer|min:1|max:1440',
+            'duration_minutes' => 'nullable|integer|min:1|max:1440',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $employee = $request->user()->employee;
-        if (!$employee) {
-            return response()->json(['message' => 'Employee profile not found'], 404);
+        $latitude = $request->latitude ?? $employee->latitude;
+        $longitude = $request->longitude ?? $employee->longitude;
+
+        if (is_null($latitude) || is_null($longitude)) {
+            return response()->json([
+                'message' => 'Lokasi terakhir tidak ditemukan. Pastikan GPS aktif dan telah memperbarui lokasi.'
+            ], 400);
         }
 
+        $duration = $request->duration ?? $request->duration_minutes ?? 60;
         $shareToken = bin2hex(random_bytes(16));
-        $expiresAt = now()->addMinutes($request->duration);
+        $expiresAt = now()->addMinutes($duration);
 
-        // Store in cache or create a temporary sharing table
+        // Store in cache
         cache()->put("location_share_{$shareToken}", [
             'employee_id' => $employee->id,
-            'latitude' => $request->latitude,
-            'longitude' => $request->longitude,
+            'latitude' => $latitude,
+            'longitude' => $longitude,
             'expires_at' => $expiresAt,
         ], $expiresAt);
 
@@ -287,5 +339,44 @@ class LocationController extends Controller
             'longitude' => $locationData['longitude'],
             'shared_at' => $locationData['expires_at']->subMinutes(request()->duration ?? 60),
         ]);
+    }
+
+    private function calculateDistance($lat1, $lon1, $lat2, $lon2)
+    {
+        $earthRadius = 6371000; // Meter
+        $latDelta = deg2rad($lat2 - $lat1);
+        $lonDelta = deg2rad($lon2 - $lon1);
+
+        $a = sin($latDelta / 2) * sin($latDelta / 2) +
+             cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
+             sin($lonDelta / 2) * sin($lonDelta / 2);
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+
+        return $earthRadius * $c; // Jarak dalam meter
+    }
+
+    private function downsampleLocations($locations, $maxPoints = 20)
+    {
+        $count = $locations->count();
+        if ($count <= $maxPoints) {
+            return $locations;
+        }
+
+        $step = ceil($count / $maxPoints);
+        $downsampled = collect();
+        
+        // Selalu sertakan titik paling baru (titik terakhir yang direkam, karena orderByDesc)
+        $downsampled->push($locations->first());
+        
+        for ($i = $step; $i < $count - 1; $i += $step) {
+            $downsampled->push($locations[$i]);
+        }
+        
+        // Selalu sertakan titik paling awal (lokasi awal pergerakan)
+        if ($count > 1) {
+            $downsampled->push($locations->last());
+        }
+
+        return $downsampled;
     }
 }

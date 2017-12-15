@@ -17,7 +17,25 @@ class CompanyRegistrationRequest extends FormRequest
     {
         return [
             'company_name' => 'required|string|max:255',
-            'contact_email' => 'required|email|max:255|unique:company_registrations,contact_email|unique:users,email',
+            'contact_email' => [
+                'required',
+                'email',
+                'max:255',
+                'unique:users,email',
+                function ($attribute, $value, $fail) {
+                    $registration = \Illuminate\Support\Facades\DB::table('company_registrations')
+                        ->where('contact_email', $value)
+                        ->first();
+                        
+                    if ($registration) {
+                        if ($registration->status === 'rejected') {
+                            $fail('Pendaftaran di tolak silahkan daftar ulang atau hubungi cs');
+                        } else {
+                            $fail('Email sudah terdaftar');
+                        }
+                    }
+                }
+            ],
             'contact_phone' => 'required|string|max:20',
         ];
     }
@@ -29,7 +47,7 @@ class CompanyRegistrationRequest extends FormRequest
             'company_name.max' => 'Nama perusahaan maksimal 255 karakter',
             'contact_email.required' => 'Email kontak wajib diisi',
             'contact_email.email' => 'Format email tidak valid',
-            'contact_email.unique' => 'Email sudah terdaftar',
+            'contact_email.unique' => 'Email sudah terdaftar di sistem kami',
             'contact_phone.required' => 'Nomor telepon wajib diisi',
             'contact_phone.max' => 'Nomor telepon maksimal 20 karakter',
         ];

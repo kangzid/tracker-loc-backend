@@ -97,9 +97,22 @@ class TaskController extends Controller
         return response()->json($task->load(['employee.user', 'assignedBy']), 201);
     }
 
-    public function show($id)
+    public function show(Request $request, $id)
     {
         $task = Task::with(['employee.user', 'assignedBy'])->findOrFail($id);
+        $user = $request->user();
+
+        // Tenant isolation: Admin can only view tasks from their organization, Employee can only view their own tasks
+        if ($user->isAdmin()) {
+            if ($task->admin_id != $user->id) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+        } else {
+            if (!$user->employee || $task->assigned_to != $user->employee->id) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+        }
+
         return response()->json($task);
     }
 
@@ -108,15 +121,21 @@ class TaskController extends Controller
         $task = Task::findOrFail($id);
         $user = $request->user();
 
-        // Admin can update any task, employee can only update their own tasks
-        if (!$user->isAdmin() && (!$user->employee || $task->assigned_to !== $user->employee->id)) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+        // Tenant isolation: Admin can only update tasks in their tenant, employee can only update their own tasks
+        if ($user->isAdmin()) {
+            if ($task->admin_id != $user->id) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+        } else {
+            if (!$user->employee || $task->assigned_to != $user->employee->id) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
         }
 
         $validator = Validator::make($request->all(), [
             'title' => 'sometimes|required|string|max:255',
             'description' => 'nullable|string',
-            'status' => 'sometimes|required|in:pending,in_progress,completed,cancelled',
+            'status' => 'sometimes|required|in:pending,accepted,in_progress,completed,cancelled',
             'priority' => 'sometimes|required|in:low,medium,high,urgent',
             'due_date' => 'nullable|date|after:now',
             'completion_notes' => 'nullable|string',
@@ -149,6 +168,12 @@ class TaskController extends Controller
         }
 
         $task = Task::findOrFail($id);
+        
+        // Tenant isolation: Ensure admin only deletes tasks belonging to their tenant
+        if ($task->admin_id != $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
         $task->delete();
 
         return response()->json(['message' => 'Task deleted successfully']);

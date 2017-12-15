@@ -99,6 +99,7 @@ LocaTrack is a comprehensive backend API designed for employee attendance tracki
 For detailed endpoint documentation, please refer to the following resources located in the `docs/` directory:
 - **API Overview**: `docs/API_DOCUMENTATION.md`
 - **Testing Guide**: `docs/API_TEST.md`
+- **GPS Simulator & Optimization Guide**: [docs/testing/gps-simulator-guide.md](file:///e:/Semester-6/proyek-utama-informatika/code-projects/backup/tracker-loc-backend/docs/testing/gps-simulator-guide.md)
 - **Postman Collection**: `docs/postman_collection.json`
 
 ## Default Credentials

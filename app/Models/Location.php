@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\MassPrunable;
 
 class Location extends Model
 {
-    use HasFactory;
+    use HasFactory, MassPrunable;
 
     /**
      * Prepare a date for array / JSON serialization.
@@ -66,5 +67,13 @@ class Location extends Model
     public function trackable()
     {
         return $this->morphTo();
+    }
+
+    /**
+     * Get the prunable model query.
+     */
+    public function prunable(): Builder
+    {
+        return static::where('recorded_at', '<', now()->subDays(30));
     }
 }
