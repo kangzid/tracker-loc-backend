@@ -117,6 +117,7 @@ class UserController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'is_active' => $request->is_active ?? true,
+            'photo_base64' => $request->photo_base64 ?? $user->photo_base64,
         ]);
 
         if ($request->password) {

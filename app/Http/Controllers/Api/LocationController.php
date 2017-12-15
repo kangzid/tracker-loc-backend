@@ -98,7 +98,9 @@ class LocationController extends Controller
                 'last_location_update' => now(),
             ]);
 
-            // Broadcast location update via WebSocket untuk real-time tracking
+            $tenantId = $request->trackable_type === 'employee' ? ($trackable->admin_id ?? $request->user()->id) : ($trackable->admin_id ?? $request->user()->id);
+
+            // Broadcast location update via WebSocket untuk real-time tracking (Individual & Tenant Aggregated)
             LocationUpdated::dispatch(
                 $request->trackable_type,
                 $request->trackable_id,
@@ -107,7 +109,8 @@ class LocationController extends Controller
                 $request->speed,
                 $request->accuracy,
                 now(),
-                $entityName
+                $entityName,
+                $tenantId
             );
         });
 

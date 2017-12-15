@@ -60,6 +60,7 @@ class EmployeeController extends Controller
                     'address' => $request->address,
                     'department' => $request->department,
                     'position' => $request->position,
+                    'photo_base64' => $request->photo_base64,
                 ]);
             }
 
@@ -144,12 +145,118 @@ class EmployeeController extends Controller
             'address' => $request->address,
             'department' => $request->department,
             'position' => $request->position,
+            'photo_base64' => $request->photo_base64,
         ]));
 
         return response()->json($employee->load('user'));
     }
 
-    public function destroy(Request $request, $id)
+    
+            public function getComprehensiveProfile(Request $request, $id)
+    {
+        $adminId = $request->user()->isAdmin() ? $request->user()->id : ($request->user()->admin_id ?? $request->user()->id);
+        
+        $employee = Employee::with('user')
+            ->where('admin_id', $adminId)
+            ->where(function($q) use ($id) {
+                $q->where('id', $id)
+                  ->orWhere('employee_id', $id)
+                  ->orWhere('user_id', $id);
+            })
+            ->first();
+
+        if (!$employee) {
+            $employee = Employee::with('user')
+                ->where(function($q) use ($id) {
+                    $q->where('id', $id)
+                      ->orWhere('employee_id', $id)
+                      ->orWhere('user_id', $id);
+                })
+                ->first();
+        }
+
+        if (!$employee) {
+            return response()->json(['message' => 'Data karyawan tidak ditemukan.'], 404);
+        }
+
+        $tenantId = $employee->admin_id;
+
+        // 1. Documents
+        $documents = \App\Models\HrisDocument::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->get();
+
+        // 2. Performance Reviews
+        $performanceReviews = \App\Models\HrisPerformanceReview::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->orderBy('created_at', 'desc')->get();
+
+        // 3. Assigned Assets
+        $assets = \App\Models\HrisAsset::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->get();
+
+        // 4. Loans / Kasbon
+        $loans = \App\Models\HrisLoan::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->orderBy('created_at', 'desc')->get();
+
+        // 5. Overtime Requests
+        $overtimes = \App\Models\HrisOvertime::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->orderBy('date', 'desc')->take(10)->get();
+
+        // 6. Reimbursement Claims
+        $claims = \App\Models\HrisClaim::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->orderBy('claim_date', 'desc')->take(10)->get();
+
+        // 7. Violations & SP
+        $violations = \App\Models\HrisViolation::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->orderBy('violation_date', 'desc')->get();
+
+        // 8. Training & Certifications
+        $trainings = \App\Models\HrisTrainingParticipant::with('training')->where('employee_id', $employee->id)->get();
+
+        // 9. Compliance Items
+        $complianceItems = \App\Models\HrisComplianceItem::where('tenant_id', $tenantId)->where('target_type', 'employee')->where('target_id', $employee->id)->get();
+
+        // 10. Pengajuan Cuti / Izin
+        $requests = \App\Models\HrisRequest::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->orderBy('created_at', 'desc')->take(10)->get();
+
+        
+        // 11. Contracts & Active Contract Data
+        $contracts = \App\Models\HrisContract::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->orderBy('created_at', 'desc')->get();
+        $activeContract = $contracts->firstWhere('status', 'active') ?: $contracts->first();
+
+        // 12. Salary, Allowances & Bank Data
+        $salary = \App\Models\HrisEmployeeSalary::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->first();
+        if (!$salary && $activeContract) {
+            $salary = [
+                'amount' => $activeContract->basic_salary,
+                'bank_name' => $activeContract->bank_name,
+                'bank_account_number' => $activeContract->bank_account_number,
+                'bank_account_holder' => $activeContract->bank_account_holder ?: ($employee->user ? $employee->user->name : null),
+                'status' => 'active'
+            ];
+        }
+
+        $allowances = \App\Models\HrisEmployeeAllowance::with('items.allowanceType')->where('tenant_id', $tenantId)->where('employee_id', $employee->id)->first();
+        $contractAllowances = $activeContract ? ($activeContract->allowances_json ?: []) : [];
+
+        $bpjs = \App\Models\HrisEmployeeBpjs::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->first();
+        $mutations = \App\Models\HrisMutation::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->orderBy('effective_date', 'desc')->get();
+
+        return response()->json([
+            'employee' => $employee,
+            'documents' => $documents,
+            'performance_reviews' => $performanceReviews,
+            'assets' => $assets,
+            'loans' => $loans,
+            'overtimes' => $overtimes,
+            'claims' => $claims,
+            'violations' => $violations,
+            'trainings' => $trainings,
+            'compliance_items' => $complianceItems,
+            'requests' => $requests,
+            'salary' => $salary,
+            'allowances' => $allowances,
+            'contract_allowances' => $contractAllowances,
+            'bpjs' => $bpjs,
+            'contracts' => $contracts,
+            'mutations' => $mutations,
+        ]);
+
+    }
+
+public function destroy(Request $request, $id)
     {
         if (!$request->user()->isAdmin()) {
             return response()->json(['message' => 'Unauthorized'], 403);

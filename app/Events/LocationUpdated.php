@@ -8,6 +8,8 @@ use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
+use App\Models\Employee;
+use App\Models\Vehicle;
 
 class LocationUpdated implements ShouldBroadcastNow
 {
@@ -21,11 +23,12 @@ class LocationUpdated implements ShouldBroadcastNow
     public $accuracy;
     public $recordedAt;
     public $entityName;
+    public $tenantId;
 
     /**
      * Create a new event instance.
      */
-    public function __construct($trackableType, $trackableId, $latitude, $longitude, $speed = null, $accuracy = null, $recordedAt = null, $entityName = null)
+    public function __construct($trackableType, $trackableId, $latitude, $longitude, $speed = null, $accuracy = null, $recordedAt = null, $entityName = null, $tenantId = null)
     {
         $this->trackableType = $trackableType;
         $this->trackableId = $trackableId;
@@ -35,6 +38,19 @@ class LocationUpdated implements ShouldBroadcastNow
         $this->accuracy = $accuracy;
         $this->recordedAt = $recordedAt ?? now();
         $this->entityName = $entityName;
+        
+        // Ensure tenantId is resolved
+        if ($tenantId) {
+            $this->tenantId = (int)$tenantId;
+        } else {
+            if ($trackableType === 'employee') {
+                $emp = Employee::find($trackableId);
+                $this->tenantId = $emp ? (int)$emp->admin_id : null;
+            } elseif ($trackableType === 'vehicle') {
+                $veh = Vehicle::find($trackableId);
+                $this->tenantId = $veh ? (int)$veh->admin_id : null;
+            }
+        }
     }
 
     /**
@@ -42,9 +58,16 @@ class LocationUpdated implements ShouldBroadcastNow
      */
     public function broadcastOn(): array
     {
-        return [
+        $channels = [
             new PrivateChannel("location.{$this->trackableType}.{$this->trackableId}"),
         ];
+
+        // Broadcast to aggregated tenant channel for high-performance single-subscription monitoring
+        if ($this->tenantId) {
+            $channels[] = new PrivateChannel("tenant.{$this->tenantId}.locations");
+        }
+
+        return $channels;
     }
 
     /**
@@ -61,6 +84,7 @@ class LocationUpdated implements ShouldBroadcastNow
             'accuracy' => $this->accuracy ? (float) $this->accuracy : null,
             'recorded_at' => $this->recordedAt->toIso8601String(),
             'entity_name' => $this->entityName,
+            'tenant_id' => $this->tenantId,
         ];
     }
 

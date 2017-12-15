@@ -20,6 +20,8 @@ class Employee extends Model
         'latitude',
         'longitude',
         'last_location_update',
+        'basic_salary',
+        'photo_base64',
     ];
 
     protected static function boot()
@@ -49,6 +51,11 @@ class Employee extends Model
     public function admin()
     {
         return $this->belongsTo(User::class, 'admin_id');
+    }
+
+    public function payslips()
+    {
+        return $this->hasMany(HrisPayslip::class, 'employee_id');
     }
 
     public function attendances()

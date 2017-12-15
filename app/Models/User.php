@@ -27,6 +27,7 @@ class User extends Authenticatable
         'admin_id',
         'is_active',
         'must_change_password',
+        'photo_base64',
     ];
 
     protected $hidden = [

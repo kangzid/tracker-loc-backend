@@ -77,6 +77,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/admin/attendances', [AttendanceController::class, 'storeAdmin']);
     Route::put('/admin/attendances/{id}', [AttendanceController::class, 'update']);
     Route::delete('/admin/attendances/{id}', [AttendanceController::class, 'destroy']);
+    Route::get('/admin/attendances/settings', [AttendanceController::class, 'getSettings']);
+    Route::post('/admin/attendances/settings', [AttendanceController::class, 'saveSettings']);
     Route::post('/admin/attendances/cleanup', [AttendanceController::class, 'cleanupOldAttendances']);
 
     Route::post('/locations', [LocationController::class, 'store']);
@@ -95,6 +97,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('geofences', GeofenceController::class);
 
     Route::post('/employees', [EmployeeController::class, 'store'])->middleware('subscription.quota:employee');
+    Route::get('/employees/{id}/profile', [EmployeeController::class, 'getComprehensiveProfile']);
     Route::apiResource('employees', EmployeeController::class)->except('store');
 
     Route::post('/vehicles', [VehicleController::class, 'store'])->middleware('subscription.quota:vehicle');
@@ -126,6 +129,205 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('users', UserController::class);
 
     Route::get('/employee/dashboard', [\App\Http\Controllers\Api\EmployeeDashboardController::class, 'index']);
+
+    // HRIS Payroll & Master Data Routes
+    Route::prefix('hris')->group(function () {
+        // 1. Slip Gaji (Bulanan & Harian)
+        Route::get('/payrolls', [App\Http\Controllers\Api\HrisPayrollController::class, 'index']);
+        Route::post('/payrolls/generate-monthly', [App\Http\Controllers\Api\HrisPayrollController::class, 'generateMonthly']);
+        Route::post('/payrolls/generate-daily', [App\Http\Controllers\Api\HrisPayrollController::class, 'generateDaily']);
+        Route::get('/payrolls/{id}/slips', [App\Http\Controllers\Api\HrisPayrollController::class, 'slips']);
+        Route::post('/payrolls/{id}/publish', [App\Http\Controllers\Api\HrisPayrollController::class, 'publish']);
+        Route::delete('/payrolls/{id}', [App\Http\Controllers\Api\HrisPayrollController::class, 'destroy']);
+
+        // 2. Gaji Pokok
+        Route::get('/salaries', [App\Http\Controllers\Api\HrisSalaryController::class, 'index']);
+        Route::post('/salaries', [App\Http\Controllers\Api\HrisSalaryController::class, 'store']);
+        Route::delete('/salaries/{id}', [App\Http\Controllers\Api\HrisSalaryController::class, 'destroy']);
+
+        // 3. Jenis Tunjangan
+        Route::get('/allowance-types', [App\Http\Controllers\Api\HrisPayrollMasterController::class, 'getAllowanceTypes']);
+        Route::post('/allowance-types', [App\Http\Controllers\Api\HrisPayrollMasterController::class, 'storeAllowanceType']);
+        Route::delete('/allowance-types/{id}', [App\Http\Controllers\Api\HrisPayrollMasterController::class, 'deleteAllowanceType']);
+
+        // 4. Tunjangan (Matrix per Karyawan)
+        Route::get('/allowances', [App\Http\Controllers\Api\HrisPayrollMasterController::class, 'getEmployeeAllowances']);
+        Route::post('/allowances', [App\Http\Controllers\Api\HrisPayrollMasterController::class, 'storeEmployeeAllowance']);
+        Route::delete('/allowances/{id}', [App\Http\Controllers\Api\HrisPayrollMasterController::class, 'deleteEmployeeAllowance']);
+
+        // 5. BPJS (Kesehatan & Ketenagakerjaan)
+        Route::get('/bpjs', [App\Http\Controllers\Api\HrisPayrollMasterController::class, 'getBpjs']);
+        Route::post('/bpjs', [App\Http\Controllers\Api\HrisPayrollMasterController::class, 'storeBpjs']);
+        Route::delete('/bpjs/{id}', [App\Http\Controllers\Api\HrisPayrollMasterController::class, 'deleteBpjs']);
+
+        // 6. Penyesuaian Gaji (Batches & Items)
+        Route::get('/adjustments/batches', [App\Http\Controllers\Api\HrisPayrollMasterController::class, 'getAdjustmentBatches']);
+        Route::post('/adjustments/batches', [App\Http\Controllers\Api\HrisPayrollMasterController::class, 'storeAdjustmentBatch']);
+        Route::delete('/adjustments/batches/{batchId}', [App\Http\Controllers\Api\HrisPayrollMasterController::class, 'deleteAdjustmentBatch']);
+        Route::post('/adjustments/batches/{batchId}/items', [App\Http\Controllers\Api\HrisPayrollMasterController::class, 'storeAdjustmentItem']);
+        Route::delete('/adjustments/items/{id}', [App\Http\Controllers\Api\HrisPayrollMasterController::class, 'deleteAdjustmentItem']);
+
+        // 7. Pengajuan (HRIS Requests)
+        Route::get('/requests', [\App\Http\Controllers\Api\HrisRequestController::class, 'index']);
+        Route::post('/requests', [\App\Http\Controllers\Api\HrisRequestController::class, 'store']);
+        Route::post('/requests/{id}/approve', [\App\Http\Controllers\Api\HrisRequestController::class, 'approve']);
+        Route::post('/requests/{id}/reject', [\App\Http\Controllers\Api\HrisRequestController::class, 'reject']);
+        Route::delete('/requests/{id}', [\App\Http\Controllers\Api\HrisRequestController::class, 'destroy']);
+
+        // 8. Pengaturan Cuti (Leave Types & Balances)
+        Route::get('/leave-types', [\App\Http\Controllers\Api\HrisLeaveSettingController::class, 'getLeaveTypes']);
+        Route::post('/leave-types', [\App\Http\Controllers\Api\HrisLeaveSettingController::class, 'storeLeaveType']);
+        Route::delete('/leave-types/{id}', [\App\Http\Controllers\Api\HrisLeaveSettingController::class, 'deleteLeaveType']);
+        Route::get('/leave-balances', [\App\Http\Controllers\Api\HrisLeaveSettingController::class, 'getLeaveBalances']);
+        Route::put('/leave-balances/{id}', [\App\Http\Controllers\Api\HrisLeaveSettingController::class, 'updateLeaveBalance']);
+
+        // 9. Lembur (Overtime)
+        Route::get('/overtimes/summary', [\App\Http\Controllers\Api\HrisOvertimeController::class, 'summary']);
+        Route::get('/overtimes/settings', [\App\Http\Controllers\Api\HrisOvertimeController::class, 'getSettings']);
+        Route::post('/overtimes/settings', [\App\Http\Controllers\Api\HrisOvertimeController::class, 'saveSettings']);
+        Route::get('/overtimes', [\App\Http\Controllers\Api\HrisOvertimeController::class, 'index']);
+        Route::post('/overtimes', [\App\Http\Controllers\Api\HrisOvertimeController::class, 'store']);
+        Route::post('/overtimes/{id}/approve', [\App\Http\Controllers\Api\HrisOvertimeController::class, 'approve']);
+        Route::post('/overtimes/{id}/reject', [\App\Http\Controllers\Api\HrisOvertimeController::class, 'reject']);
+        Route::delete('/overtimes/{id}', [\App\Http\Controllers\Api\HrisOvertimeController::class, 'destroy']);
+
+        // 10. Reimbursement (Claims)
+        Route::get('/claims/summary', [\App\Http\Controllers\Api\HrisClaimController::class, 'summary']);
+        Route::get('/claims/types', [\App\Http\Controllers\Api\HrisClaimController::class, 'getClaimTypes']);
+        Route::post('/claims/types', [\App\Http\Controllers\Api\HrisClaimController::class, 'storeClaimType']);
+        Route::delete('/claims/types/{id}', [\App\Http\Controllers\Api\HrisClaimController::class, 'deleteClaimType']);
+        Route::get('/claims', [\App\Http\Controllers\Api\HrisClaimController::class, 'index']);
+        Route::post('/claims', [\App\Http\Controllers\Api\HrisClaimController::class, 'store']);
+        Route::post('/claims/{id}/approve', [\App\Http\Controllers\Api\HrisClaimController::class, 'approve']);
+        Route::post('/claims/{id}/reject', [\App\Http\Controllers\Api\HrisClaimController::class, 'reject']);
+        Route::post('/claims/{id}/mark-paid', [\App\Http\Controllers\Api\HrisClaimController::class, 'markPaid']);
+        Route::delete('/claims/{id}', [\App\Http\Controllers\Api\HrisClaimController::class, 'destroy']);
+
+        // 11. Inventaris Aset (Assets)
+        Route::get('/assets/summary', [\App\Http\Controllers\Api\HrisAssetController::class, 'summary']);
+        Route::get('/assets', [\App\Http\Controllers\Api\HrisAssetController::class, 'index']);
+        Route::post('/assets', [\App\Http\Controllers\Api\HrisAssetController::class, 'store']);
+        Route::put('/assets/{id}', [\App\Http\Controllers\Api\HrisAssetController::class, 'update']);
+        Route::post('/assets/{id}/assign', [\App\Http\Controllers\Api\HrisAssetController::class, 'assign']);
+        Route::post('/assets/{id}/return', [\App\Http\Controllers\Api\HrisAssetController::class, 'returnAsset']);
+        Route::delete('/assets/{id}', [\App\Http\Controllers\Api\HrisAssetController::class, 'destroy']);
+
+        // 12. Pinjaman & Kasbon (Loans)
+        Route::get('/loans/summary', [\App\Http\Controllers\Api\HrisLoanController::class, 'summary']);
+        Route::get('/loans', [\App\Http\Controllers\Api\HrisLoanController::class, 'index']);
+        Route::post('/loans', [\App\Http\Controllers\Api\HrisLoanController::class, 'store']);
+        Route::post('/loans/{id}/manual-payment', [\App\Http\Controllers\Api\HrisLoanController::class, 'manualPayment']);
+        Route::get('/loans/{id}/history', [\App\Http\Controllers\Api\HrisLoanController::class, 'history']);
+        Route::delete('/loans/{id}', [\App\Http\Controllers\Api\HrisLoanController::class, 'destroy']);
+
+        // 13. Pengumuman & Berita Perusahaan (News & Announcements)
+        Route::get('/news/summary', [\App\Http\Controllers\Api\HrisNewsController::class, 'summary']);
+        Route::get('/news', [\App\Http\Controllers\Api\HrisNewsController::class, 'index']);
+        Route::post('/news', [\App\Http\Controllers\Api\HrisNewsController::class, 'store']);
+        Route::put('/news/{id}', [\App\Http\Controllers\Api\HrisNewsController::class, 'update']);
+        Route::post('/news/{id}/toggle-publish', [\App\Http\Controllers\Api\HrisNewsController::class, 'togglePublish']);
+        Route::delete('/news/{id}', [\App\Http\Controllers\Api\HrisNewsController::class, 'destroy']);
+
+        // 14. KPI & Evaluasi Kinerja (Performance Appraisals)
+        Route::get('/performance/summary', [\App\Http\Controllers\Api\HrisPerformanceController::class, 'summary']);
+        Route::get('/performance/department-stats', [\App\Http\Controllers\Api\HrisPerformanceController::class, 'departmentStats']);
+        Route::get('/performance', [\App\Http\Controllers\Api\HrisPerformanceController::class, 'index']);
+        Route::post('/performance', [\App\Http\Controllers\Api\HrisPerformanceController::class, 'store']);
+        Route::put('/performance/{id}', [\App\Http\Controllers\Api\HrisPerformanceController::class, 'update']);
+        Route::post('/performance/{id}/finalize', [\App\Http\Controllers\Api\HrisPerformanceController::class, 'finalizeReview']);
+        Route::delete('/performance/{id}', [\App\Http\Controllers\Api\HrisPerformanceController::class, 'destroy']);
+
+          // 15. Digital Documents (Brankas Berkas Karyawan)
+          Route::get('/documents/summary', [\App\Http\Controllers\Api\HrisDocumentController::class, 'summary']);
+          Route::get('/documents', [\App\Http\Controllers\Api\HrisDocumentController::class, 'index']);
+          Route::post('/documents', [\App\Http\Controllers\Api\HrisDocumentController::class, 'store']);
+          Route::put('/documents/{id}', [\App\Http\Controllers\Api\HrisDocumentController::class, 'update']);
+          Route::post('/documents/{id}/verify', [\App\Http\Controllers\Api\HrisDocumentController::class, 'verify']);
+          Route::delete('/documents/{id}', [\App\Http\Controllers\Api\HrisDocumentController::class, 'destroy']);
+
+          // 16. Pelanggaran & Surat Peringatan (Violations & Warning Letters)
+          Route::get('/violations/summary', [\App\Http\Controllers\Api\HrisViolationController::class, 'summary']);
+          Route::get('/violations/types', [\App\Http\Controllers\Api\HrisViolationController::class, 'types']);
+          Route::post('/violations/types', [\App\Http\Controllers\Api\HrisViolationController::class, 'storeType']);
+          Route::put('/violations/types/{id}', [\App\Http\Controllers\Api\HrisViolationController::class, 'updateType']);
+          Route::delete('/violations/types/{id}', [\App\Http\Controllers\Api\HrisViolationController::class, 'destroyType']);
+          Route::get('/violations', [\App\Http\Controllers\Api\HrisViolationController::class, 'index']);
+          Route::post('/violations', [\App\Http\Controllers\Api\HrisViolationController::class, 'store']);
+          Route::put('/violations/{id}', [\App\Http\Controllers\Api\HrisViolationController::class, 'update']);
+          Route::post('/violations/{id}/revoke', [\App\Http\Controllers\Api\HrisViolationController::class, 'revoke']);
+          Route::delete('/violations/{id}', [\App\Http\Controllers\Api\HrisViolationController::class, 'destroy']);
+
+          // 17. Compliance & Alerts (Legalitas SIM, STNK, KIR, K3)
+          
+        
+        // Master Settings: Training Categories, KPI Periods, Compliance Doc Types, Asset Categories
+        Route::get('/training-categories', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'getTrainingCategories']);
+        Route::post('/training-categories', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'storeTrainingCategory']);
+        Route::put('/training-categories/{id}', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'updateTrainingCategory']);
+        Route::delete('/training-categories/{id}', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'deleteTrainingCategory']);
+
+        Route::get('/kpi-periods', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'getKpiPeriods']);
+        Route::post('/kpi-periods', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'storeKpiPeriod']);
+        Route::put('/kpi-periods/{id}', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'updateKpiPeriod']);
+        Route::delete('/kpi-periods/{id}', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'deleteKpiPeriod']);
+
+        Route::get('/compliance-doc-types', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'getComplianceDocTypes']);
+        Route::post('/compliance-doc-types', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'storeComplianceDocType']);
+        Route::put('/compliance-doc-types/{id}', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'updateComplianceDocType']);
+        Route::delete('/compliance-doc-types/{id}', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'deleteComplianceDocType']);
+
+        Route::get('/asset-categories', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'getAssetCategories']);
+        Route::post('/asset-categories', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'storeAssetCategory']);
+        Route::put('/asset-categories/{id}', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'updateAssetCategory']);
+        Route::delete('/asset-categories/{id}', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'deleteAssetCategory']);
+
+        
+        Route::get('/document-categories', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'getDocumentCategories']);
+        Route::post('/document-categories', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'storeDocumentCategory']);
+        Route::put('/document-categories/{id}', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'updateDocumentCategory']);
+        Route::delete('/document-categories/{id}', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'deleteDocumentCategory']);
+
+        
+        // Master Banks
+        Route::get('/banks', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'getBanks']);
+        Route::post('/banks', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'storeBank']);
+        Route::put('/banks/{id}', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'updateBank']);
+        Route::delete('/banks/{id}', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'deleteBank']);
+
+        // Mutasi & Promosi
+        Route::get('/mutations/summary', [\App\Http\Controllers\Api\HrisMutationController::class, 'summary']);
+        Route::apiResource('/mutations', \App\Http\Controllers\Api\HrisMutationController::class);
+
+        // Kontrak Kerja
+        Route::apiResource('/contract-types', \App\Http\Controllers\Api\HrisContractTypeController::class);
+        Route::get('/contracts/summary', [\App\Http\Controllers\Api\HrisContractController::class, 'summary']);
+        Route::get('/contracts/{id}/download', [\App\Http\Controllers\Api\HrisContractController::class, 'downloadPdf']);
+        Route::get('/contracts', [\App\Http\Controllers\Api\HrisContractController::class, 'index']);
+        Route::post('/contracts', [\App\Http\Controllers\Api\HrisContractController::class, 'store']);
+        Route::get('/contracts/{id}', [\App\Http\Controllers\Api\HrisContractController::class, 'show']);
+        Route::put('/contracts/{id}', [\App\Http\Controllers\Api\HrisContractController::class, 'update']);
+        Route::delete('/contracts/{id}', [\App\Http\Controllers\Api\HrisContractController::class, 'destroy']);
+
+        Route::get('/compliance/summary', [\App\Http\Controllers\Api\HrisComplianceController::class, 'summary']);
+          Route::get('/compliance', [\App\Http\Controllers\Api\HrisComplianceController::class, 'index']);
+          Route::post('/compliance', [\App\Http\Controllers\Api\HrisComplianceController::class, 'store']);
+          Route::put('/compliance/{id}', [\App\Http\Controllers\Api\HrisComplianceController::class, 'update']);
+          Route::post('/compliance/{id}/renew', [\App\Http\Controllers\Api\HrisComplianceController::class, 'renew']);
+          Route::delete('/compliance/{id}', [\App\Http\Controllers\Api\HrisComplianceController::class, 'destroy']);
+
+          // 18. Training & Skills (Pelatihan & Sertifikasi)
+          Route::get('/training/summary', [\App\Http\Controllers\Api\HrisTrainingController::class, 'summary']);
+          Route::get('/training', [\App\Http\Controllers\Api\HrisTrainingController::class, 'index']);
+          Route::post('/training', [\App\Http\Controllers\Api\HrisTrainingController::class, 'store']);
+          Route::put('/training/{id}', [\App\Http\Controllers\Api\HrisTrainingController::class, 'update']);
+          Route::post('/training/{id}/participants', [\App\Http\Controllers\Api\HrisTrainingController::class, 'addParticipants']);
+          Route::put('/training/{id}/participants/{participantId}', [\App\Http\Controllers\Api\HrisTrainingController::class, 'updateParticipant']);
+          Route::delete('/training/{id}/participants/{participantId}', [\App\Http\Controllers\Api\HrisTrainingController::class, 'removeParticipant']);
+          Route::post('/training/{id}/complete', [\App\Http\Controllers\Api\HrisTrainingController::class, 'complete']);
+          Route::delete('/training/{id}', [\App\Http\Controllers\Api\HrisTrainingController::class, 'destroy']);
+
+
+    });
 
     // Support Chat Routes
     Route::get('/support/messages', [SupportChatController::class, 'index']);
@@ -179,3 +381,7 @@ Route::middleware(['auth:sanctum', 'superadmin'])->prefix('superadmin')->group(f
 });
 
 Route::fallback(fn() => response()->json(['message' => 'API endpoint not found'], 404));
+
+
+
+

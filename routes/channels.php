@@ -16,3 +16,13 @@ Broadcast::channel('location.{trackableType}.{trackableId}', function ($user, $t
 Broadcast::channel('support.chat.{id}', function ($user, $id) {
     return (int) $user->id === (int) $id;
 });
+// Tenant aggregated location channel (Optimasi 1 channel untuk semua armada/karyawan tenant)
+Broadcast::channel('tenant.{tenantId}.locations', function ($user, $tenantId) {
+    if ($user->isAdmin()) {
+        return (int) $user->id === (int) $tenantId;
+    }
+    if ($user->isEmployee() && $user->employee) {
+        return (int) $user->employee->admin_id === (int) $tenantId;
+    }
+    return false;
+});

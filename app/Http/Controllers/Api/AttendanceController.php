@@ -266,9 +266,11 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        // Only allow edit within 7 days
-        if (Carbon::parse($attendance->date)->diffInDays(Carbon::now()) > 7) {
-            return response()->json(['message' => 'Can only edit attendance within 7 days'], 403);
+        // Configurable limit per tenant (0 = unlimited / unrestricted)
+        $setting = \App\Models\HrisAttendanceSetting::where('tenant_id', $request->user()->id)->first();
+        $limitDays = $setting ? $setting->edit_delete_limit_days : 0;
+        if ($limitDays > 0 && Carbon::parse($attendance->date)->diffInDays(Carbon::now()) > $limitDays) {
+            return response()->json(['message' => "Can only edit attendance within {$limitDays} days"], 403);
         }
 
         $validator = Validator::make($request->all(), [
@@ -313,9 +315,11 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        // Only allow delete within 7 days
-        if (Carbon::parse($attendance->date)->diffInDays(Carbon::now()) > 7) {
-            return response()->json(['message' => 'Can only delete attendance within 7 days'], 403);
+        // Configurable limit per tenant (0 = unlimited / unrestricted)
+        $setting = \App\Models\HrisAttendanceSetting::where('tenant_id', $request->user()->id)->first();
+        $limitDays = $setting ? $setting->edit_delete_limit_days : 0;
+        if ($limitDays > 0 && Carbon::parse($attendance->date)->diffInDays(Carbon::now()) > $limitDays) {
+            return response()->json(['message' => "Can only delete attendance within {$limitDays} days"], 403);
         }
 
         $attendance->delete();
@@ -423,6 +427,47 @@ class AttendanceController extends Controller
             'is_in_office' => $isInOffice,
             'message' => $isInOffice ? 'Anda berada di area kantor' : 'Anda berada di luar area kantor'
         ]);
+    }
+
+    
+    public function getSettings(Request $request)
+    {
+        if (!$request->user()->isAdmin()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $setting = \App\Models\HrisAttendanceSetting::firstOrCreate(
+            ['tenant_id' => $request->user()->id],
+            ['edit_delete_limit_days' => 0, 'allow_admin_bypass' => true]
+        );
+
+        return response()->json($setting);
+    }
+
+    public function saveSettings(Request $request)
+    {
+        if (!$request->user()->isAdmin()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'edit_delete_limit_days' => 'required|integer|min:0|max:3650',
+            'allow_admin_bypass' => 'nullable|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $setting = \App\Models\HrisAttendanceSetting::updateOrCreate(
+            ['tenant_id' => $request->user()->id],
+            [
+                'edit_delete_limit_days' => $request->edit_delete_limit_days,
+                'allow_admin_bypass' => $request->allow_admin_bypass ?? true,
+            ]
+        );
+
+        return response()->json($setting);
     }
 
     public function cleanupOldAttendances(Request $request)
