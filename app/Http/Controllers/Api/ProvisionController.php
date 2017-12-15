@@ -63,11 +63,14 @@ class ProvisionController extends Controller
             $user->save();
 
             // 2. Buat subscription trial 30 hari
+            $trialPlan = \App\Models\Plan::where('slug', 'trial')->first();
+            
             $subscription = Subscription::create([
                 'user_id'       => $user->id,
-                'plan'          => 'trial',
-                'max_employees' => 1,
-                'max_vehicles'  => 1,
+                'plan_id'       => $trialPlan ? $trialPlan->id : null,
+                'max_employees' => $trialPlan ? $trialPlan->max_employees : 1,
+                'max_vehicles'  => $trialPlan ? $trialPlan->max_vehicles : 1,
+                'ai_credits_limit' => $trialPlan ? $trialPlan->ai_credits : 20,
                 'company_name'  => $request->company_name,
                 'contact_phone' => $request->contact_phone,
                 'started_at'    => now(),
@@ -112,7 +115,7 @@ class ProvisionController extends Controller
             return response()->json(['message' => 'Unauthorized. Hanya Admin yang dapat mengakses endpoint ini.'], 403);
         }
 
-        $subscription = Subscription::where('user_id', $user->id)
+        $subscription = Subscription::with('planDetails')->where('user_id', $user->id)
             ->latest()
             ->first();
 
@@ -137,7 +140,7 @@ class ProvisionController extends Controller
             'subscription'      => [
                 'id'                => $subscription->id,
                 'company_name'      => $subscription->company_name,
-                'plan'              => $subscription->plan,
+                'plan'              => $subscription->plan, // Menggunakan accessor getPlanAttribute
                 'status'            => $subscription->status,
                 'max_employees'     => $subscription->max_employees,
                 'max_vehicles'      => $subscription->max_vehicles,
@@ -145,6 +148,9 @@ class ProvisionController extends Controller
                 'expired_at'        => $subscription->expired_at->toDateTimeString(),
                 'days_remaining'    => $subscription->daysRemaining(),
                 'is_active'         => $subscription->isActive(),
+                'ai_credits_limit'  => $subscription->ai_credits_limit,
+                'ai_credits_used'   => $subscription->ai_credits_used,
+                'ai_credits_remaining' => $subscription->aiCreditsRemaining(),
             ],
             'usage'             => [
                 'employees'         => [

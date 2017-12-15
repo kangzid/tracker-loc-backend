@@ -47,6 +47,7 @@ class EmployeeController extends Controller
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
                 'role' => $request->role,
+                'admin_id' => $request->user()->id,
             ]);
 
             $employee = null;

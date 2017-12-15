@@ -120,6 +120,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::get('/ai/query', [AIController::class, 'query']);
+    Route::post('/ai/usage', [AIController::class, 'recordUsage']);
 
     Route::get('/admins', [UserController::class, 'admins']);
     Route::apiResource('users', UserController::class);
@@ -136,6 +137,7 @@ Route::middleware('auth:sanctum')->group(function () {
 // ============================================================
 Route::middleware(['auth:sanctum', 'superadmin'])->prefix('superadmin')->group(function () {
     Route::get('/dashboard', [SuperAdminController::class, 'dashboard']);
+    Route::get('/ai/query', [App\Http\Controllers\Api\SuperadminAIController::class, 'query']);
 
     Route::prefix('registrations')->group(function () {
         Route::get('/pending', [CompanyRegistrationController::class, 'pending']);
@@ -164,6 +166,7 @@ Route::middleware(['auth:sanctum', 'superadmin'])->prefix('superadmin')->group(f
     Route::apiResource('plans', PlanController::class);
 
     Route::get('/transactions', [PaymentController::class, 'getTransactions']);
+    Route::post('/transactions/{orderId}/sync', [PaymentController::class, 'syncTransaction']);
 
     Route::apiResource('vouchers', VoucherController::class);
 

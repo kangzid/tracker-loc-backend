@@ -35,11 +35,11 @@ class SuperAdminController extends Controller
         $totalEmployees = Employee::count();
         $totalVehicles = Vehicle::count();
         $activeSubs = Subscription::where('status', 'active')->whereDate('expired_at', '>=', now())->count();
-        $expiredSubs = Subscription::where('status', 'expired')
-            ->orWhere(function ($q) {
-                $q->where('status', 'active')->whereDate('expired_at', '<', now());
-            })->count();
-        $trialSubs = Subscription::where('plan', 'trial')->where('status', 'active')->count();
+        $expiredSubs = Subscription::where('status', 'expired')->orWhereDate('expired_at', '<', now())->count();
+        
+        // Get plan ID for trial
+        $trialPlanId = \App\Models\Plan::where('slug', 'trial')->value('id');
+        $trialSubs = $trialPlanId ? Subscription::where('plan_id', $trialPlanId)->where('status', 'active')->count() : 0;
 
         // Statistik Pendapatan (Bulan Ini)
         $currentMonthRevenue = \App\Models\Transaction::where('payment_status', 'settlement')
@@ -370,7 +370,7 @@ class SuperAdminController extends Controller
         $status = $request->query('status');  // active, expired, cancelled
         $perPage = $request->query('per_page', 15);
 
-        $query = Subscription::with('user');
+        $query = Subscription::with(['user', 'planDetails']);
 
         if ($status) {
             $query->where('status', $status);
@@ -394,18 +394,43 @@ class SuperAdminController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'plan' => 'sometimes|in:trial,starter,pro,enterprise',
+            'plan' => 'sometimes|string|exists:plans,slug',
             'max_employees' => 'sometimes|integer|min:1',
             'max_vehicles' => 'sometimes|integer|min:1',
             'expired_at' => 'sometimes|date',
-            'status' => 'sometimes|in:active,inactive,expired,cancelled',
+            'ai_credits_limit' => 'sometimes|integer|min:0',
+            'status' => 'sometimes|in:active,inactive,expired,cancelled,pending',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['message' => 'Validasi gagal.', 'errors' => $validator->errors()], 422);
         }
 
-        $subscription->update($request->only(['plan', 'max_employees', 'max_vehicles', 'expired_at', 'status']));
+        $updateData = $request->only(['max_employees', 'max_vehicles', 'expired_at', 'status', 'ai_credits_limit']);
+        
+        // Reset AI usage if requested
+        if ($request->boolean('reset_ai_usage')) {
+            $updateData['ai_credits_used'] = 0;
+        }
+
+        // Apply credit adjustment if provided
+        if ($request->has('adjustment')) {
+            $updateData['ai_credits_limit'] = $subscription->ai_credits_limit + (int)$request->adjustment;
+        }
+        
+        // If plan is changed, also sync plan_id and credits
+        if ($request->has('plan')) {
+            $plan = \App\Models\Plan::where('slug', $request->plan)->first();
+            if ($plan) {
+                $updateData['plan_id'] = $plan->id;
+                // If max_employees/max_vehicles not provided manually, use from plan
+                if (!$request->has('max_employees')) $updateData['max_employees'] = $plan->max_employees;
+                if (!$request->has('max_vehicles')) $updateData['max_vehicles'] = $plan->max_vehicles;
+                $updateData['ai_credits_limit'] = $plan->ai_credits;
+            }
+        }
+
+        $subscription->update($updateData);
 
         return response()->json([
             'message' => 'Subscription berhasil diperbarui.',

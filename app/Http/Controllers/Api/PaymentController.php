@@ -208,10 +208,22 @@ class PaymentController extends Controller
      */
     public function webhook(Request $request)
     {
-        $notif = new \Midtrans\Notification();
+        $serverKey = config('services.midtrans.server_key');
+        
+        // Ambil data langsung dari request body untuk signature (agar presisi gross_amount terjaga)
+        $orderId     = $request->order_id;
+        $statusCode  = $request->status_code;
+        $grossAmount = $request->gross_amount;
+        $signature   = $request->signature_key;
 
+        $hashed = hash("sha512", $orderId . $statusCode . $grossAmount . $serverKey);
+        
+        if ($hashed !== $signature) {
+            return response()->json(['message' => 'Invalid signature'], 403);
+        }
+
+        $notif = new \Midtrans\Notification();
         $transaction = $notif->transaction_status;
-        $orderId     = $notif->order_id;
         $fraudStatus = $notif->fraud_status;
 
         $transactionRecord = Transaction::where('midtrans_order_id', $orderId)->first();
@@ -246,14 +258,15 @@ class PaymentController extends Controller
             $plan = Plan::find($subscription->pending_plan_id ?? $subscription->plan_id);
             
             $subscription->update([
-                'status'        => 'active',
-                'plan_id'       => $plan->id,
-                'plan'          => $plan->slug,
-                'max_employees' => $plan->max_employees,
-                'max_vehicles'  => $plan->max_vehicles,
-                'started_at'    => now(),
-                'expired_at'    => now()->addDays(30),
-                'pending_plan_id' => null, // Reset pending
+                'status'           => 'active',
+                'plan_id'          => $plan->id,
+                'max_employees'    => $plan->max_employees,
+                'max_vehicles'     => $plan->max_vehicles,
+                'ai_credits_limit' => $plan->ai_credits,
+                'ai_credits_used'  => 0, // Reset usage for new billing cycle
+                'started_at'       => now(),
+                'expired_at'       => now()->addDays(30),
+                'pending_plan_id'  => null, // Reset pending
             ]);
 
             // Increment voucher usage if applicable
@@ -314,14 +327,15 @@ class PaymentController extends Controller
                 $plan = Plan::find($subscription->pending_plan_id ?? $subscription->plan_id);
                 
                 $subscription->update([
-                    'status'        => 'active',
-                    'plan_id'       => $plan->id,
-                    'plan'          => $plan->slug,
-                    'max_employees' => $plan->max_employees,
-                    'max_vehicles'  => $plan->max_vehicles,
-                    'started_at'    => now(),
-                    'expired_at'    => now()->addDays(30),
-                    'pending_plan_id' => null, // Reset pending
+                    'status'           => 'active',
+                    'plan_id'          => $plan->id,
+                    'max_employees'    => $plan->max_employees,
+                    'max_vehicles'     => $plan->max_vehicles,
+                    'ai_credits_limit' => $plan->ai_credits,
+                    'ai_credits_used'  => 0, // Reset usage for new billing cycle
+                    'started_at'       => now(),
+                    'expired_at'       => now()->addDays(30),
+                    'pending_plan_id'  => null, // Reset pending
                 ]);
 
                 if ($subscription->voucher_code) {
@@ -339,15 +353,78 @@ class PaymentController extends Controller
         }
     }
 
-    /**
-     * GET /api/superadmin/transactions
-     */
     public function getTransactions()
     {
-        $transactions = Transaction::with(['user', 'plan'])
+        $transactions = Transaction::with(['user', 'planDetails'])
             ->orderBy('created_at', 'desc')
             ->get();
             
         return response()->json($transactions);
+    }
+
+    /**
+     * POST /api/superadmin/transactions/{orderId}/sync
+     * Manual sync status by Superadmin
+     */
+    public function syncTransaction($orderId)
+    {
+        $transactionRecord = Transaction::where('midtrans_order_id', $orderId)->first();
+        $subscription = Subscription::where('midtrans_order_id', $orderId)->first();
+
+        if (!$subscription) return response()->json(['message' => 'Order tidak ditemukan'], 404);
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::withoutVerifying()
+                ->withHeaders([
+                    'Accept'        => 'application/json',
+                    'Content-Type'  => 'application/json',
+                    'Authorization' => 'Basic ' . base64_encode(config('services.midtrans.server_key') . ':'),
+                ])
+                ->get("https://api.sandbox.midtrans.com/v2/{$orderId}/status");
+
+            if (!$response->successful()) throw new \Exception('Gagal cek status ke Midtrans.');
+
+            $data = $response->json();
+            $transactionStatus = $data['transaction_status'];
+            
+            $newStatus = $transactionStatus;
+            if ($transactionStatus == 'capture' || $transactionStatus == 'settlement') {
+                $newStatus = 'settlement';
+            }
+
+            if ($transactionRecord) {
+                $transactionRecord->update([
+                    'payment_status' => $newStatus,
+                    'payment_type'   => $data['payment_type'] ?? null,
+                    'payload'        => $data,
+                ]);
+            }
+
+            $subscription->update(['payment_status' => $newStatus]);
+
+            if ($newStatus === 'settlement') {
+                $plan = Plan::find($subscription->pending_plan_id ?? $subscription->plan_id);
+                if ($plan) {
+                    $subscription->update([
+                        'status'           => 'active',
+                        'plan_id'          => $plan->id,
+                        'max_employees'    => $plan->max_employees,
+                        'max_vehicles'     => $plan->max_vehicles,
+                        'ai_credits_limit' => $plan->ai_credits,
+                        'ai_credits_used'  => 0,
+                        'started_at'       => now(),
+                        'expired_at'       => now()->addDays(30),
+                        'pending_plan_id'  => null,
+                    ]);
+                }
+            }
+
+            return response()->json([
+                'status' => $newStatus,
+                'message' => 'Status berhasil disinkronisasi.'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
     }
 }

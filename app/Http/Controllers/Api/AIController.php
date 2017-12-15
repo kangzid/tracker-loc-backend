@@ -26,6 +26,17 @@ class AIController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
+        // Cek kredit AI (Opsional: Kita bisa membiarkan tool calling tetap jalan selama session chat masih aktif,
+        // tapi sebaiknya tetap ada pengaman dasar di sini)
+        $subscription = \App\Models\Subscription::where('user_id', $user->id)->latest()->first();
+        if ($subscription && !$subscription->isActive()) {
+            return response()->json(['error' => 'Subscription tidak aktif atau sudah expired.'], 403);
+        }
+
+        if ($subscription && $subscription->aiCreditsRemaining() < 1) {
+            return response()->json(['error' => 'Kredit AI Anda telah habis.'], 403);
+        }
+
         switch ($action) {
             case 'list_employees':
                 return $this->listEmployees($request, $user->id);
@@ -38,6 +49,34 @@ class AIController extends Controller
             default:
                 return response()->json(['error' => 'Action tidak valid'], 400);
         }
+    }
+
+    /**
+     * POST /api/ai/usage
+     * Mencatat penggunaan kredit AI.
+     */
+    public function recordUsage(Request $request)
+    {
+        $user = $request->user();
+        $subscription = \App\Models\Subscription::where('user_id', $user->id)->latest()->first();
+
+        if (!$subscription) {
+            return response()->json(['error' => 'Subscription tidak ditemukan'], 404);
+        }
+
+        $cost = $request->input('cost', 2); // Default 2 kredit per pertanyaan
+        
+        if ($subscription->aiCreditsRemaining() < $cost) {
+            return response()->json(['error' => 'Kredit tidak cukup'], 403);
+        }
+
+        $subscription->increment('ai_credits_used', $cost);
+
+        return response()->json([
+            'success' => true,
+            'credits_used' => $subscription->ai_credits_used,
+            'credits_remaining' => $subscription->aiCreditsRemaining()
+        ]);
     }
 
     private function listEmployees(Request $request, $adminId)

@@ -88,8 +88,12 @@ class SuperadminNotificationController extends Controller
      */
     public function index(Request $request)
     {
-        $notifications = Notification::where('created_by', $request->user()->id)
-            ->where('recipient_type', 'broadcast')
+        // Get all broadcast notifications (Always include trashed for history transparency)
+        $notifications = Notification::withTrashed()
+            ->where(function($query) {
+                $query->where('recipient_type', 'broadcast')
+                      ->orWhereNotNull('admin_ids');
+            })
             ->with(['adminStatus'])
             ->orderBy('created_at', 'desc')
             ->paginate(20);
@@ -114,11 +118,7 @@ class SuperadminNotificationController extends Controller
      */
     public function show($id)
     {
-        $notification = Notification::findOrFail($id);
-
-        if ($notification->created_by !== auth()->id()) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $notification = Notification::withTrashed()->findOrFail($id);
 
         $notification->load(['adminStatus']);
 
@@ -139,11 +139,7 @@ class SuperadminNotificationController extends Controller
      */
     public function destroy($id)
     {
-        $notification = Notification::findOrFail($id);
-
-        if ($notification->created_by !== auth()->id()) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $notification = Notification::withTrashed()->findOrFail($id);
 
         // Delete image if exists
         if ($notification->image_url) {

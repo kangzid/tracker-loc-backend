@@ -92,12 +92,16 @@ class CompanyRegistrationService
                 'must_change_password' => true,
             ]);
 
-            // Create trial subscription (14 days, 2 emp, 2 vehicles)
+            // Create trial subscription
+            $trialPlan = \App\Models\Plan::where('slug', 'trial')->first();
+            
             \App\Models\Subscription::create([
                 'user_id' => $admin->id,
-                'plan' => 'trial',
-                'max_employees' => 2,
-                'max_vehicles' => 2,
+                'plan_id' => $trialPlan ? $trialPlan->id : null,
+                'max_employees' => $trialPlan ? $trialPlan->max_employees : 2,
+                'max_vehicles' => $trialPlan ? $trialPlan->max_vehicles : 2,
+                'ai_credits_limit' => $trialPlan ? $trialPlan->ai_credits : 20,
+                'ai_credits_used' => 0,
                 'company_name' => $registration->company_name,
                 'contact_phone' => $registration->contact_phone,
                 'started_at' => now(),

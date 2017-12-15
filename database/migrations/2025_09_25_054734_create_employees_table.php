@@ -14,15 +14,21 @@ return new class extends Migration
         Schema::create('employees', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->string('employee_id')->unique();
-            $table->string('phone')->nullable();
+            $table->foreignId('admin_id')->constrained('users')->onDelete('cascade');
+            $table->string('employee_id', 50)->unique();
+            $table->string('phone', 20)->nullable();
             $table->text('address')->nullable();
-            $table->string('department')->nullable();
-            $table->string('position')->nullable();
+            $table->string('department', 100)->nullable();
+            $table->string('position', 100)->nullable();
             $table->decimal('latitude', 10, 8)->nullable();
             $table->decimal('longitude', 11, 8)->nullable();
             $table->timestamp('last_location_update')->nullable();
             $table->timestamps();
+
+            // PERFORMANCE INDEXES
+            $table->index('admin_id', 'idx_employees_admin_id');
+            $table->index('user_id', 'idx_employees_user_id');
+            $table->index('employee_id', 'idx_employees_employee_id');
         });
     }
 

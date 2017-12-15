@@ -16,6 +16,7 @@ class Plan extends Model
         'price_monthly',
         'max_employees',
         'max_vehicles',
+        'ai_credits',
         'features',
         'is_active',
         'is_custom',

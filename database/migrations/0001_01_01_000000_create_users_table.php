@@ -13,14 +13,22 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
+            $table->string('name', 50); // Diperpendek sesuai saran dosen (50 karakter)
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            $table->enum('role', ['admin', 'employee'])->default('employee');
+            $table->enum('role', ['superadmin', 'admin', 'employee'])->default('employee');
+            $table->foreignId('admin_id')->nullable()->constrained('users')->onDelete('cascade');
             $table->boolean('is_active')->default(true);
+            $table->boolean('must_change_password')->default(false);
             $table->rememberToken();
             $table->timestamps();
+
+            // PERFORMANCE INDEXES
+            $table->index('role', 'idx_users_role');
+            $table->index('is_active', 'idx_users_is_active');
+            $table->index(['role', 'is_active'], 'idx_users_role_active');
+            $table->index('admin_id', 'idx_users_admin_id');
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {

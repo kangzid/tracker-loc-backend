@@ -23,6 +23,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role',
+        'admin_id',
         'is_active',
         'must_change_password',
     ];
@@ -73,9 +75,17 @@ class User extends Authenticatable
     }
 
     /**
+     * Relationship to the tenant admin
+     */
+    public function admin()
+    {
+        return $this->belongsTo(User::class, 'admin_id');
+    }
+
+    /**
      * Get admin_id for tenant isolation
      * - If user is admin, return their own ID
-     * - If user is employee, return their admin's ID from employee record
+     * - If user is employee, return their admin_id from users table
      */
     public function getAdminId()
     {
@@ -83,10 +93,6 @@ class User extends Authenticatable
             return $this->id;
         }
         
-        if ($this->isEmployee() && $this->employee) {
-            return $this->employee->admin_id;
-        }
-        
-        return null;
+        return $this->admin_id;
     }
 }

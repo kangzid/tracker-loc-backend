@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('attendances', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('admin_id')->constrained('users')->onDelete('cascade');
             $table->foreignId('employee_id')->constrained()->onDelete('cascade');
             $table->date('date');
             $table->time('check_in')->nullable();
@@ -24,7 +25,14 @@ return new class extends Migration
             $table->enum('status', ['present', 'absent', 'late', 'early_leave'])->default('present');
             $table->text('notes')->nullable();
             $table->timestamps();
+
             $table->unique(['employee_id', 'date']);
+            
+            // PERFORMANCE INDEXES
+            $table->index('admin_id', 'idx_attendances_admin_id');
+            $table->index('date', 'idx_attendances_date');
+            $table->index('status', 'idx_attendances_status');
+            $table->index(['employee_id', 'date'], 'idx_attendances_employee_date');
         });
     }
 

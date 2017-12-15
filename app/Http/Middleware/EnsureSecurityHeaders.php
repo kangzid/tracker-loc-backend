@@ -18,10 +18,15 @@ class EnsureSecurityHeaders
             'max-age=31536000; includeSubDomains'
         );
 
-        // Content Security Policy (CSP) - versi aman + support cdnjs untuk Font Awesome
+        // Content Security Policy (CSP) - versi aman + support cdnjs & unpkg (untuk Scramble Docs)
         $response->headers->set(
             'Content-Security-Policy',
-            "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data:; font-src 'self' https://cdnjs.cloudflare.com data:; connect-src 'self';"
+            "default-src 'self'; " .
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com; " .
+            "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://unpkg.com; " .
+            "img-src 'self' data: blob:; " .
+            "font-src 'self' https://cdnjs.cloudflare.com data:; " .
+            "connect-src 'self' https://unpkg.com;"
         );
 
         // Clickjacking Protection

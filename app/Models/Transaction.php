@@ -20,8 +20,8 @@ class Transaction extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function plan()
+    public function planDetails()
     {
-        return $this->belongsTo(Plan::class);
+        return $this->belongsTo(Plan::class, 'plan_id');
     }
 }

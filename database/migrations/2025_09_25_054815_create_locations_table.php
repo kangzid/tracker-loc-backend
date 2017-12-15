@@ -21,7 +21,11 @@ return new class extends Migration
             $table->decimal('accuracy', 8, 2)->nullable();
             $table->timestamp('recorded_at');
             $table->timestamps();
-            $table->index(['trackable_type', 'trackable_id', 'recorded_at']);
+
+            // PERFORMANCE INDEXES
+            $table->index(['latitude', 'longitude'], 'idx_locations_coordinates');
+            $table->index(['trackable_type', 'trackable_id'], 'idx_locations_trackable');
+            $table->index(['trackable_type', 'trackable_id', 'recorded_at'], 'idx_locations_trackable_history');
         });
     }
 
