@@ -17,6 +17,8 @@ use App\Models\HrisEmployeeBpjs;
 use App\Models\HrisSalaryAdjustmentBatch;
 use App\Models\HrisRequest;
 use App\Models\HrisRequestPolicy;
+use App\Models\HrisContract;
+use App\Models\HrisResignation;
 use App\Services\EncryptedStorageService;
 use Illuminate\Support\Facades\DB;
 
@@ -66,7 +68,7 @@ class HrisPayrollController extends Controller
         ]);
     }
 
-    public function generateMonthly(Request $request)
+        public function generateMonthly(Request $request)
     {
         $request->validate([
             'month' => 'required|integer|min:1|max:12',
@@ -96,7 +98,11 @@ class HrisPayrollController extends Controller
                 'processed_by' => $tenantId,
             ]);
 
-            $employees = Employee::where('admin_id', $tenantId)->with('user')->get();
+            // Only fetch active employees
+            $employees = Employee::where('admin_id', $tenantId)
+                ->where('is_active', 1)
+                ->with('user')
+                ->get();
             $totalAmount = 0;
 
             $adjBatch = HrisSalaryAdjustmentBatch::where('tenant_id', $tenantId)
@@ -108,22 +114,75 @@ class HrisPayrollController extends Controller
             $absencePolicy = HrisRequestPolicy::where('tenant_id', $tenantId)->where('policy_type', 'absence')->first();
             $sickPolicy = HrisRequestPolicy::where('tenant_id', $tenantId)->where('policy_type', 'sick')->first();
 
+            $periodStartStr = date('Y-m-d', strtotime($request->period_start));
+            $periodEndStr = date('Y-m-d', strtotime($request->period_end));
+
             foreach ($employees as $emp) {
+                // 0. Check Resignation / Non-active status
+                $resignation = HrisResignation::where('tenant_id', $tenantId)
+                    ->where('employee_id', $emp->id)
+                    ->where('status', 'approved')
+                    ->first();
+                if ($resignation && $resignation->effective_date && $resignation->effective_date < $periodStartStr) {
+                    // Employee already resigned before payroll period
+                    continue;
+                }
+
+                // 0.1 Check Contract validity for this payroll period
+                $contracts = HrisContract::where('tenant_id', $tenantId)
+                    ->where('employee_id', $emp->id)
+                    ->where('status', '!=', 'terminated')
+                    ->get();
+
+                $activeContract = null;
+                if ($contracts->isNotEmpty()) {
+                    // Find a contract covering this payroll period
+                    $validContract = $contracts->first(function ($c) use ($periodStartStr, $periodEndStr) {
+                        $cStart = date('Y-m-d', strtotime($c->start_date));
+                        $cEnd = $c->end_date ? date('Y-m-d', strtotime($c->end_date)) : null;
+
+                        $startOk = $cStart <= $periodEndStr;
+                        $endOk = empty($cEnd) || $cEnd >= $periodStartStr;
+
+                        return $startOk && $endOk && ($c->status === 'active' || (empty($c->status) && $endOk));
+                    });
+
+                    if (!$validContract) {
+                        // Employee has contracts, but none are valid/active for this period (e.g. expired)
+                        continue;
+                    }
+                    $activeContract = $validContract;
+                }
+
                 // 1. Basic Salary
+                $basicSalary = 0;
                 $salaryRecord = HrisEmployeeSalary::where('tenant_id', $tenantId)
                     ->where('employee_id', $emp->id)
                     ->where('wage_type', 'Bulanan')
                     ->latest('effective_date')
                     ->first();
-                $basicSalary = $salaryRecord ? (float)$salaryRecord->amount : 0;
+
+                if ($activeContract && (float)$activeContract->basic_salary > 0) {
+                    $basicSalary = (float)$activeContract->basic_salary;
+                } elseif ($salaryRecord) {
+                    $basicSalary = (float)$salaryRecord->amount;
+                }
 
                 // 2. Allowances
+                $allowances = 0;
                 $allowanceRecord = HrisEmployeeAllowance::where('tenant_id', $tenantId)
                     ->where('employee_id', $emp->id)
                     ->with('items')
                     ->latest('effective_date')
                     ->first();
-                $allowances = $allowanceRecord ? (float)$allowanceRecord->items->sum('amount') : 0;
+
+                if ($activeContract && !empty($activeContract->allowances_json) && is_array($activeContract->allowances_json)) {
+                    foreach ($activeContract->allowances_json as $ca) {
+                        $allowances += (float)($ca['amount'] ?? 0);
+                    }
+                } elseif ($allowanceRecord) {
+                    $allowances = (float)$allowanceRecord->items->sum('amount');
+                }
 
                 // 3. Overtime Pay
                 $overtimePay = (float) HrisOvertime::where('tenant_id', $tenantId)
@@ -226,13 +285,13 @@ class HrisPayrollController extends Controller
             $payroll->update(['total_amount' => $totalAmount]);
 
             return response()->json([
-                'message' => 'Slip gaji bulanan berhasil digenerate!',
+                'message' => 'Payroll bulanan berhasil digenerate!',
                 'payroll' => $payroll->load('payslips.employee.user'),
             ], 201);
         });
     }
 
-    public function generateDaily(Request $request)
+        public function generateDaily(Request $request)
     {
         $request->validate([
             'slip_date' => 'required|date',
@@ -260,12 +319,35 @@ class HrisPayrollController extends Controller
 
             $dailySalaries = HrisEmployeeSalary::where('tenant_id', $tenantId)
                 ->where('wage_type', 'Harian')
+                ->whereHas('employee', function($eq) {
+                    $eq->where('is_active', 1);
+                })
                 ->with('employee.user')
                 ->get();
 
             $totalAmount = 0;
+            $periodStartStr = date('Y-m-d', strtotime($request->period_start));
+            $periodEndStr = date('Y-m-d', strtotime($request->period_end));
 
             foreach ($dailySalaries as $sal) {
+                $emp = $sal->employee;
+                if (!$emp || !$emp->is_active) continue;
+
+                // Check contract
+                $contracts = HrisContract::where('tenant_id', $tenantId)
+                    ->where('employee_id', $emp->id)
+                    ->where('status', '!=', 'terminated')
+                    ->get();
+
+                if ($contracts->isNotEmpty()) {
+                    $validContract = $contracts->first(function ($c) use ($periodStartStr, $periodEndStr) {
+                        $cStart = date('Y-m-d', strtotime($c->start_date));
+                        $cEnd = $c->end_date ? date('Y-m-d', strtotime($c->end_date)) : null;
+                        return $cStart <= $periodEndStr && (empty($cEnd) || $cEnd >= $periodStartStr) && ($c->status === 'active' || empty($c->status));
+                    });
+                    if (!$validContract) continue;
+                }
+
                 $basicSalary = (float)$sal->amount;
                 $overtimePay = (float) HrisOvertime::where('tenant_id', $tenantId)
                     ->where('employee_id', $sal->employee_id)

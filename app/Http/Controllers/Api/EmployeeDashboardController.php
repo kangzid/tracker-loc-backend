@@ -7,6 +7,9 @@ use Illuminate\Http\Request;
 use App\Models\Attendance;
 use App\Models\Task;
 use App\Models\Notification;
+use App\Models\HrisShiftAssignment;
+use App\Models\HrisAttendanceSetting;
+use App\Services\EncryptedStorageService;
 use Carbon\Carbon;
 
 class EmployeeDashboardController extends Controller
@@ -15,7 +18,7 @@ class EmployeeDashboardController extends Controller
     {
         $user = $request->user();
         
-        if (!$user->isEmployee()) {
+        if (!$user || !$user->isEmployee()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -23,6 +26,37 @@ class EmployeeDashboardController extends Controller
         
         if (!$employee) {
             return response()->json(['message' => 'Employee profile not found'], 404);
+        }
+
+        $todayStr = Carbon::today()->format('Y-m-d');
+
+        // Resolve Today's Shift for Employee
+        $todayShiftName = 'Shift Reguler';
+        $setting = HrisAttendanceSetting::where('tenant_id', $employee->admin_id)->first();
+        if ($setting && $setting->is_shift_enabled) {
+            $assignment = HrisShiftAssignment::where('employee_id', $employee->id)
+                ->where('date', $todayStr)
+                ->with('shift')
+                ->first();
+
+            if ($assignment && $assignment->shift) {
+                $todayShiftName = $assignment->shift->name;
+            } else {
+                $todayShiftName = 'Libur Kerja';
+            }
+        }
+
+        // Photo Base64 resolution
+        $photoPath = $employee->photo_path ?: ($user ? $user->photo_path : null);
+        if ($photoPath) {
+            try {
+                $employee->photo_base64 = EncryptedStorageService::getBase64($photoPath);
+                if ($user) {
+                    $user->photo_base64 = $employee->photo_base64;
+                }
+            } catch (\Throwable $e) {
+                // fallback
+            }
         }
 
         // Attendance Today
@@ -59,6 +93,7 @@ class EmployeeDashboardController extends Controller
         return response()->json([
             // Standard/New response format
             'employee' => $employee->load('user'),
+            'today_shift' => $todayShiftName,
             'attendance_today' => $attendanceToday,
             'tasks_summary' => [
                 'pending' => $tasksSummary['pending'],

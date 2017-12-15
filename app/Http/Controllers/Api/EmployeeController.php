@@ -193,29 +193,39 @@ class EmployeeController extends Controller
         $adminId = $isAdmin ? $user->id : ($user->admin_id ?? 2);
         
         $employee = null;
-        if ($id === 'me' || ($user->role === 'employee' && ($user->employee && $user->employee->id == $id))) {
+        if ($id === 'me') {
             $employee = $user->employee ? $user->employee->load('user') : null;
+        } elseif ($user->role === 'employee' && $user->employee && ($user->employee->id == $id || $user->employee->employee_id == $id)) {
+            $employee = $user->employee->load('user');
         }
 
+        // Primary Lookup: Exact Primary Key (id) if numeric, or exact Code (employee_id) if string
         if (!$employee) {
-            $employee = Employee::with('user')
-                ->where('admin_id', $adminId)
-                ->where(function($q) use ($id) {
-                    $q->where('id', $id)
-                      ->orWhere('employee_id', $id)
-                      ->orWhere('user_id', $id);
-                })
-                ->first();
+            if (is_numeric($id)) {
+                $employee = Employee::with('user')
+                    ->where('admin_id', $adminId)
+                    ->where('id', (int)$id)
+                    ->first();
+            } else {
+                $employee = Employee::with('user')
+                    ->where('admin_id', $adminId)
+                    ->where('employee_id', $id)
+                    ->first();
+            }
         }
 
+        // Fallback without adminId scoping if not found
         if (!$employee) {
-            $employee = Employee::with('user')
-                ->where(function($q) use ($id) {
-                    $q->where('id', $id)
-                      ->orWhere('employee_id', $id)
-                      ->orWhere('user_id', $id);
-                })
-                ->first();
+            if (is_numeric($id)) {
+                $employee = Employee::with('user')->where('id', (int)$id)->first();
+            } else {
+                $employee = Employee::with('user')->where('employee_id', $id)->first();
+            }
+        }
+
+        // Last fallback for employee user_id if still not found
+        if (!$employee && is_numeric($id)) {
+            $employee = Employee::with('user')->where('user_id', (int)$id)->first();
         }
 
         if (!$employee) {
