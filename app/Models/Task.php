@@ -33,6 +33,16 @@ class Task extends Model
         'started_at',
         'completed_at',
         'completion_notes',
+        'task_type',
+        'vehicle_id',
+        'origin_lat',
+        'origin_lng',
+        'origin_address',
+        'destination_lat',
+        'destination_lng',
+        'destination_address',
+        'estimated_distance',
+        'estimated_duration',
     ];
 
     protected function casts(): array
@@ -102,4 +112,10 @@ class Task extends Model
     {
         return $this->belongsTo(User::class, 'admin_id');
     }
+
+    public function vehicle()
+    {
+        return $this->belongsTo(Vehicle::class, 'vehicle_id');
+    }
 }
+

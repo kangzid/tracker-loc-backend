@@ -20,9 +20,10 @@ class TaskController extends Controller
             // OPTIMIZATION: Eager load with selected columns only
             $tasks = Task::with([
                     'employee.user:id,name,email', 
-                    'assignedBy:id,name,email'
+                    'assignedBy:id,name,email',
+                    'vehicle'
                 ])
-                ->select('id', 'admin_id', 'title', 'description', 'assigned_to', 'assigned_by', 'status', 'priority', 'due_date', 'created_at', 'updated_at')
+                ->select('id', 'admin_id', 'title', 'description', 'assigned_to', 'assigned_by', 'status', 'priority', 'due_date', 'created_at', 'updated_at', 'task_type', 'vehicle_id', 'origin_lat', 'origin_lng', 'origin_address', 'destination_lat', 'destination_lng', 'destination_address', 'estimated_distance', 'estimated_duration')
                 ->forAdmin($adminId)
                 ->orderBy('created_at', 'desc')
                 ->paginate(20);
@@ -33,8 +34,8 @@ class TaskController extends Controller
             }
             
             // OPTIMIZATION: Use query scope
-            $tasks = Task::with(['assignedBy:id,name,email'])
-                ->select('id', 'admin_id', 'title', 'description', 'assigned_to', 'assigned_by', 'status', 'priority', 'due_date', 'created_at', 'updated_at')
+            $tasks = Task::with(['assignedBy:id,name,email', 'vehicle'])
+                ->select('id', 'admin_id', 'title', 'description', 'assigned_to', 'assigned_by', 'status', 'priority', 'due_date', 'created_at', 'updated_at', 'task_type', 'vehicle_id', 'origin_lat', 'origin_lng', 'origin_address', 'destination_lat', 'destination_lng', 'destination_address', 'estimated_distance', 'estimated_duration')
                 ->forEmployee($employee->id)
                 ->where(function ($q) {
                     $q->where('completion_notes', 'NOT LIKE', '%[HIDDEN_BY_EMPLOYEE]%')
@@ -62,6 +63,16 @@ class TaskController extends Controller
             'address' => 'nullable|string',
             'priority' => 'required|in:low,medium,high,urgent',
             'due_date' => 'nullable|date|after:now',
+            'task_type' => 'nullable|in:general,dispatch',
+            'vehicle_id' => 'nullable|exists:vehicles,id',
+            'origin_lat' => 'nullable|numeric',
+            'origin_lng' => 'nullable|numeric',
+            'origin_address' => 'nullable|string',
+            'destination_lat' => 'nullable|numeric',
+            'destination_lng' => 'nullable|numeric',
+            'destination_address' => 'nullable|string',
+            'estimated_distance' => 'nullable|numeric',
+            'estimated_duration' => 'nullable|integer',
         ]);
 
         if ($validator->fails()) {
@@ -78,6 +89,23 @@ class TaskController extends Controller
             return response()->json(['message' => 'Employee not found or does not belong to your organization'], 404);
         }
 
+        // Ensure 1-to-1 active task per employee and vehicle
+        $activeEmployeeTask = Task::where('assigned_to', $request->assigned_to)
+            ->where('status', 'in_progress')
+            ->first();
+        if ($activeEmployeeTask) {
+            return response()->json(['message' => 'Karyawan ini sedang menjalankan tugas aktif (In Progress).', 'errors' => ['assigned_to' => ['Karyawan sedang sibuk']]], 422);
+        }
+
+        if ($request->vehicle_id) {
+            $activeVehicleTask = Task::where('vehicle_id', $request->vehicle_id)
+                ->where('status', 'in_progress')
+                ->first();
+            if ($activeVehicleTask) {
+                return response()->json(['message' => 'Kendaraan ini sedang digunakan dalam tugas aktif (In Progress).', 'errors' => ['vehicle_id' => ['Kendaraan sedang digunakan']]], 422);
+            }
+        }
+
         $task = Task::create([
             'admin_id' => $adminId,
             'title' => $request->title,
@@ -89,6 +117,16 @@ class TaskController extends Controller
             'address' => $request->address,
             'priority' => $request->priority,
             'due_date' => $request->due_date,
+            'task_type' => $request->task_type ?? 'general',
+            'vehicle_id' => $request->vehicle_id,
+            'origin_lat' => $request->origin_lat,
+            'origin_lng' => $request->origin_lng,
+            'origin_address' => $request->origin_address,
+            'destination_lat' => $request->destination_lat,
+            'destination_lng' => $request->destination_lng,
+            'destination_address' => $request->destination_address,
+            'estimated_distance' => $request->estimated_distance,
+            'estimated_duration' => $request->estimated_duration,
         ]);
 
         // Create notification for employee
@@ -139,13 +177,23 @@ class TaskController extends Controller
             'priority' => 'sometimes|required|in:low,medium,high,urgent',
             'due_date' => 'nullable|date|after:now',
             'completion_notes' => 'nullable|string',
+            'task_type' => 'nullable|in:general,dispatch',
+            'vehicle_id' => 'nullable|exists:vehicles,id',
+            'origin_lat' => 'nullable|numeric',
+            'origin_lng' => 'nullable|numeric',
+            'origin_address' => 'nullable|string',
+            'destination_lat' => 'nullable|numeric',
+            'destination_lng' => 'nullable|numeric',
+            'destination_address' => 'nullable|string',
+            'estimated_distance' => 'nullable|numeric',
+            'estimated_duration' => 'nullable|integer',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $updateData = $request->only(['title', 'description', 'status', 'priority', 'due_date', 'completion_notes']);
+        $updateData = $request->only(['title', 'description', 'status', 'priority', 'due_date', 'completion_notes', 'task_type', 'vehicle_id', 'origin_lat', 'origin_lng', 'origin_address', 'destination_lat', 'destination_lng', 'destination_address', 'estimated_distance', 'estimated_duration']);
 
         // Handle status changes
         if ($request->has('status')) {
@@ -216,8 +264,8 @@ class TaskController extends Controller
         $priority = $request->query('priority');
 
         // OPTIMIZATION: Use query scopes
-        $query = Task::with(['assignedBy:id,name,email'])
-            ->select('id', 'admin_id', 'title', 'description', 'assigned_to', 'assigned_by', 'status', 'priority', 'due_date', 'created_at', 'updated_at')
+        $query = Task::with(['assignedBy:id,name,email', 'vehicle'])
+            ->select('id', 'admin_id', 'title', 'description', 'assigned_to', 'assigned_by', 'status', 'priority', 'due_date', 'created_at', 'updated_at', 'task_type', 'vehicle_id', 'origin_lat', 'origin_lng', 'origin_address', 'destination_lat', 'destination_lng', 'destination_address', 'estimated_distance', 'estimated_duration')
             ->forEmployee($employee->id)
             ->where(function ($q) {
                 $q->where('completion_notes', 'NOT LIKE', '%[HIDDEN_BY_EMPLOYEE]%')
@@ -335,3 +383,5 @@ class TaskController extends Controller
         ]);
     }
 }
+
+
