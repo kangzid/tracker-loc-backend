@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\HrisDocument;
+use App\Services\EncryptedStorageService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -12,65 +13,65 @@ class HrisDocumentController extends Controller
     private function getTenantId(Request $request)
     {
         $user = $request->user();
-        return $user->isAdmin() ? $user->id : ($user->admin_id ?? $user->id);
+        return $user->role === 'superadmin' ? ($user->tenant_id ?? 1) : ($user->admin_id ?? $user->id);
     }
 
     public function index(Request $request)
     {
         $tenantId = $this->getTenantId($request);
-        $query = HrisDocument::where('tenant_id', $tenantId)
-            ->with(['employee.user', 'verifier']);
 
-        if ($request->filled('employee_id')) {
-            $query->where('employee_id', $request->employee_id);
-        }
+        $query = HrisDocument::with(['employee.user', 'verifier'])
+            ->where('tenant_id', $tenantId)
+            ->orderBy('id', 'desc');
 
-        if ($request->filled('category')) {
+        if ($request->has('category') && $request->category !== 'all') {
             $query->where('category', $request->category);
         }
 
-        if ($request->filled('is_verified')) {
+        if ($request->has('is_verified')) {
             $query->where('is_verified', filter_var($request->is_verified, FILTER_VALIDATE_BOOLEAN));
         }
 
-        if ($request->filled('is_original_stored')) {
+        if ($request->has('is_original_stored')) {
             $query->where('is_original_stored', filter_var($request->is_original_stored, FILTER_VALIDATE_BOOLEAN));
         }
 
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('category', 'like', "%{$search}%")
-                  ->orWhere('physical_location', 'like', "%{$search}%")
-                  ->orWhereHas('employee', function ($eq) use ($search) {
-                      $eq->where('employee_id', 'like', "%{$search}%")
-                         ->orWhereHas('user', function ($uq) use ($search) {
-                             $uq->where('name', 'like', "%{$search}%");
-                         });
-                  });
+        if ($request->has('employee_id') && $request->employee_id) {
+            $query->where('employee_id', $request->employee_id);
+        }
+
+        if ($request->has('search') && $request->search) {
+            $s = $request->search;
+            $query->where(function ($q) use ($s) {
+                $q->where('title', 'like', "%{$s}%")
+                    ->orWhere('document_name', 'like', "%{$s}%")
+                    ->orWhere('file_name', 'like', "%{$s}%")
+                    ->orWhere('physical_location', 'like', "%{$s}%")
+                    ->orWhereHas('employee.user', function ($uq) use ($s) {
+                        $uq->where('name', 'like', "%{$s}%");
+                    });
             });
         }
 
-        $items = $query->orderBy('id', 'desc')->get();
-        return response()->json($items);
+        return response()->json($query->paginate($request->get('per_page', 15)));
     }
 
     public function summary(Request $request)
     {
         $tenantId = $this->getTenantId($request);
-        $query = HrisDocument::where('tenant_id', $tenantId);
-
-        $totalDocs = (clone $query)->count();
-        $verifiedDocs = (clone $query)->where('is_verified', true)->count();
-        $unverifiedDocs = (clone $query)->where('is_verified', false)->count();
-        $originalStoredDocs = (clone $query)->where('is_original_stored', true)->count();
+        $total = HrisDocument::where('tenant_id', $tenantId)->count();
+        $verified = HrisDocument::where('tenant_id', $tenantId)->where('is_verified', true)->count();
+        $unverified = HrisDocument::where('tenant_id', $tenantId)->where('is_verified', false)->count();
+        $physical = HrisDocument::where('tenant_id', $tenantId)->where('is_original_stored', true)->count();
 
         return response()->json([
-            'total_documents' => $totalDocs,
-            'verified_count' => $verifiedDocs,
-            'unverified_count' => $unverifiedDocs,
-            'original_stored_count' => $originalStoredDocs,
+            'status' => 'success',
+            'data' => [
+                'total_documents' => $total,
+                'verified_count' => $verified,
+                'unverified_count' => $unverified,
+                'original_stored_count' => $physical,
+            ]
         ]);
     }
 
@@ -82,10 +83,10 @@ class HrisDocumentController extends Controller
             'employee_id' => 'required|exists:employees,id',
             'title' => 'required|string|max:150',
             'category' => 'required|string|max:50',
-            'file_base64' => 'required|string',
+            'file_base64' => 'nullable|string',
+            'document_file' => 'nullable|file|max:10240', // max 10MB
             'file_name' => 'nullable|string|max:255',
             'file_type' => 'nullable|string|max:50',
-            'file_size_kb' => 'nullable|integer',
             'physical_location' => 'nullable|string|max:255',
             'is_original_stored' => 'boolean',
             'notes' => 'nullable|string',
@@ -95,15 +96,35 @@ class HrisDocumentController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
+        $filePath = null;
+        $fileName = $request->file_name ?? ($request->title . '.pdf');
+        $fileType = $request->file_type ?? 'application/pdf';
+        $fileSizeKb = 0;
+
+        if ($request->hasFile('document_file')) {
+            $stored = EncryptedStorageService::storeEncrypted($request->file('document_file'), $tenantId, 'documents', 'doc_' . $request->employee_id);
+            $filePath = $stored['path'];
+            $fileName = $stored['name'];
+            $fileType = $stored['mime'];
+            $fileSizeKb = (int) ($stored['size'] / 1024);
+        } elseif ($request->filled('file_base64')) {
+            $stored = EncryptedStorageService::storeEncrypted($request->file_base64, $tenantId, 'documents', 'doc_' . $request->employee_id, $fileName);
+            $filePath = $stored['path'];
+            $fileName = $stored['name'];
+            $fileType = $stored['mime'];
+            $fileSizeKb = (int) ($stored['size'] / 1024);
+        }
+
         $doc = HrisDocument::create([
             'tenant_id' => $tenantId,
             'employee_id' => $request->employee_id,
             'title' => $request->title,
             'category' => $request->category,
-            'file_base64' => $request->file_base64,
-            'file_name' => $request->file_name ?? ($request->title . '.jpg'),
-            'file_type' => $request->file_type ?? 'image/jpeg',
-            'file_size_kb' => $request->file_size_kb ?? (int)(strlen($request->file_base64) * 0.75 / 1024),
+            'document_name' => $fileName,
+            'document_path' => $filePath,
+            'file_name' => $fileName,
+            'file_type' => $fileType,
+            'file_size_kb' => $fileSizeKb,
             'physical_location' => $request->physical_location,
             'is_original_stored' => $request->is_original_stored ?? false,
             'is_verified' => false,
@@ -113,39 +134,38 @@ class HrisDocumentController extends Controller
         return response()->json($doc->load(['employee.user', 'verifier']), 201);
     }
 
-    public function update(Request $request, $id)
+    public function show(Request $request, $id)
+    {
+        $tenantId = $this->getTenantId($request);
+        $doc = HrisDocument::with(['employee.user', 'verifier'])
+            ->where('tenant_id', $tenantId)
+            ->findOrFail($id);
+
+        return response()->json($doc);
+    }
+
+    public function preview(Request $request, $id)
     {
         $tenantId = $this->getTenantId($request);
         $doc = HrisDocument::where('tenant_id', $tenantId)->findOrFail($id);
 
-        $validator = Validator::make($request->all(), [
-            'title' => 'required|string|max:150',
-            'category' => 'required|string|max:50',
-            'file_base64' => 'nullable|string',
-            'physical_location' => 'nullable|string|max:255',
-            'is_original_stored' => 'boolean',
-            'notes' => 'nullable|string',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+        if (!$doc->document_path) {
+            return response()->json(['message' => 'Berkas dokumen tidak ditemukan.'], 404);
         }
 
-        $updateData = [
-            'title' => $request->title,
-            'category' => $request->category,
-            'physical_location' => $request->physical_location,
-            'is_original_stored' => $request->is_original_stored ?? $doc->is_original_stored,
-            'notes' => $request->notes,
-        ];
+        return EncryptedStorageService::streamResponse($doc->document_path, $doc->document_name ?: $doc->file_name ?: $doc->title, false);
+    }
 
-        if ($request->filled('file_base64')) {
-            $updateData['file_base64'] = $request->file_base64;
-            $updateData['file_size_kb'] = (int)(strlen($request->file_base64) * 0.75 / 1024);
+    public function download(Request $request, $id)
+    {
+        $tenantId = $this->getTenantId($request);
+        $doc = HrisDocument::where('tenant_id', $tenantId)->findOrFail($id);
+
+        if (!$doc->document_path) {
+            return response()->json(['message' => 'Berkas dokumen tidak ditemukan.'], 404);
         }
 
-        $doc->update($updateData);
-        return response()->json($doc->load(['employee.user', 'verifier']));
+        return EncryptedStorageService::streamResponse($doc->document_path, $doc->document_name ?: $doc->file_name ?: $doc->title, true);
     }
 
     public function verify(Request $request, $id)
@@ -154,7 +174,6 @@ class HrisDocumentController extends Controller
         $doc = HrisDocument::where('tenant_id', $tenantId)->findOrFail($id);
 
         $isVerified = $request->boolean('is_verified', true);
-
         $doc->is_verified = $isVerified;
         $doc->verified_by = $isVerified ? $request->user()->id : null;
         $doc->verified_at = $isVerified ? now() : null;
@@ -171,7 +190,6 @@ class HrisDocumentController extends Controller
         $tenantId = $this->getTenantId($request);
         $doc = HrisDocument::where('tenant_id', $tenantId)->findOrFail($id);
         $doc->delete();
-
         return response()->json(['message' => 'Dokumen berhasil dihapus.']);
     }
 }

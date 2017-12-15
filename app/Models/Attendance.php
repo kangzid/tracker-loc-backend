@@ -22,6 +22,7 @@ class Attendance extends Model
     protected $fillable = [
         'admin_id',
         'employee_id',
+        'shift_id',
         'date',
         'check_in',
         'check_out',
@@ -81,4 +82,10 @@ class Attendance extends Model
     {
         return $this->belongsTo(Employee::class);
     }
+
+    public function shift()
+    {
+        return $this->belongsTo(HrisShift::class, 'shift_id');
+    }
+
 }

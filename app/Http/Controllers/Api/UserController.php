@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\EncryptedStorageService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -117,7 +118,9 @@ class UserController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'is_active' => $request->is_active ?? true,
-            'photo_base64' => $request->photo_base64 ?? $user->photo_base64,
+            
+            'photo_path' => $user->photo_path,
+
         ]);
 
         if ($request->password) {
@@ -125,6 +128,34 @@ class UserController extends Controller
         }
 
         $user->role = $request->role;
+                if ($request->has('photo_base64')) {
+            $oldPath = $user->photo_path ?: ($user->employee ? $user->employee->photo_path : null);
+            if (empty($request->photo_base64)) {
+                if ($oldPath) {
+                    EncryptedStorageService::deleteFile($oldPath);
+                }
+                $user->photo_path = null;
+                if ($user->employee) {
+                    $user->employee->photo_path = null;
+                    $user->employee->save();
+                }
+            } elseif (str_starts_with($request->photo_base64, 'data:image')) {
+                if ($oldPath) {
+                    EncryptedStorageService::deleteFile($oldPath);
+                }
+                $stored = EncryptedStorageService::storeEncrypted(
+                    $request->photo_base64,
+                    $adminId,
+                    'avatars',
+                    'avatar_' . $user->id
+                );
+                $user->photo_path = $stored['path'];
+                if ($user->employee) {
+                    $user->employee->photo_path = $stored['path'];
+                    $user->employee->save();
+                }
+            }
+        }
         $user->save();
 
         return response()->json($user);
@@ -161,4 +192,26 @@ class UserController extends Controller
 
         return response()->json(['message' => 'User deleted successfully']);
     }
+
+            public function photo(Request $request, $id)
+    {
+        $user = User::with('employee')->find($id);
+
+        if (!$user) {
+            return response()->json(['message' => 'Pengguna tidak ditemukan.'], 404);
+        }
+
+        $photoPath = $user->photo_path ?: ($user->employee ? $user->employee->photo_path : null);
+
+        if (!$photoPath) {
+            return response()->json(['message' => 'Foto avatar tidak ditemukan.'], 404);
+        }
+
+        try {
+            return EncryptedStorageService::streamResponse($photoPath, 'avatar_' . $user->id, false);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Berkas foto tidak ditemukan di penyimpanan server.'], 404);
+        }
+    }
+
 }

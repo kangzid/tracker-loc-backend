@@ -16,6 +16,7 @@ class HrisPayroll extends Model
         'period_end',
         'total_amount',
         'status',
+        'report_file_path',
         'processed_by'
     ];
 

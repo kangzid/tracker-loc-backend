@@ -14,6 +14,7 @@ class HrisContract extends Model
     protected $fillable = [
         'tenant_id',
         'employee_id',
+        'created_by',
         'contract_number',
         'document_number',
         'contract_type',
@@ -32,7 +33,6 @@ class HrisContract extends Model
         'allowances_json',
         'document_pdf_path',
         'document_pdf_name',
-        'document_pdf_base64',
         'status',
         'notes',
     ];
@@ -51,5 +51,10 @@ class HrisContract extends Model
     public function employee()
     {
         return $this->belongsTo(Employee::class, 'employee_id');
+    }
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 }

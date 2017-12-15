@@ -26,6 +26,10 @@ use App\Http\Controllers\Api\SupportChatController;
 // ============================================================
 // Public routes
 // ============================================================
+// Public Avatar & Photo Streaming (Accessible for web <img>, new tabs, and mobile applications)
+Route::get('/employees/{id}/photo', [\App\Http\Controllers\Api\EmployeeController::class, 'photo']);
+Route::get('/users/{id}/photo', [\App\Http\Controllers\Api\UserController::class, 'photo']);
+
 Route::post('/login', [AuthController::class, 'login'])->middleware('rate.limit:login');
 Route::post('/register', [AuthController::class, 'register'])->middleware('rate.limit:api');
 Route::get('/shared-location/{token}', [LocationController::class, 'getSharedLocation']);
@@ -44,8 +48,20 @@ Route::post('/payment/webhook', [PaymentController::class, 'webhook']);
 // Protected routes
 // ============================================================
 Route::middleware('auth:sanctum')->group(function () {
+    // Vehicle Types Master (Global)
+    Route::apiResource('vehicle-types', App\Http\Controllers\Api\VehicleTypeController::class);
+    Route::apiResource('hris/vehicle-types', App\Http\Controllers\Api\VehicleTypeController::class);
+
+    // HRIS Master Departments & Positions (Global)
+    Route::apiResource('departments', App\Http\Controllers\Api\HrisDepartmentController::class);
+    Route::apiResource('positions', App\Http\Controllers\Api\HrisPositionController::class);
+    Route::apiResource('hris/departments', App\Http\Controllers\Api\HrisDepartmentController::class);
+    Route::apiResource('hris/positions', App\Http\Controllers\Api\HrisPositionController::class);
+
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/profile', [AuthController::class, 'profile']);
+    Route::put('/profile', [AuthController::class, 'updateProfile']);
+    Route::post('/profile', [AuthController::class, 'updateProfile']);
     Route::put('/change-password', [AuthController::class, 'changePassword']);
 
     Route::post('/payment/create-transaction', [PaymentController::class, 'createTransaction']);
@@ -131,7 +147,44 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/employee/dashboard', [\App\Http\Controllers\Api\EmployeeDashboardController::class, 'index']);
 
     // HRIS Payroll & Master Data Routes
-    Route::prefix('hris')->group(function () {
+    
+        // Stream & Encrypted Media Routes
+        
+        
+        
+        Route::get('/hris/claims/{id}/preview-receipt', [\App\Http\Controllers\Api\HrisClaimController::class, 'previewReceipt']);
+        Route::get('/hris/claims/{id}/download-receipt', [\App\Http\Controllers\Api\HrisClaimController::class, 'downloadReceipt']);
+        
+        Route::get('/hris/compliance/{id}/preview', [\App\Http\Controllers\Api\HrisComplianceController::class, 'previewDoc']);
+        Route::get('/hris/compliance/{id}/download', [\App\Http\Controllers\Api\HrisComplianceController::class, 'downloadDoc']);
+        
+        Route::get('/hris/violations/{id}/preview-evidence', [\App\Http\Controllers\Api\HrisViolationController::class, 'previewEvidence']);
+        Route::get('/hris/violations/{id}/download-evidence', [\App\Http\Controllers\Api\HrisViolationController::class, 'downloadEvidence']);
+        
+        Route::get('/hris/training/participants/{id}/preview-cert', [\App\Http\Controllers\Api\HrisTrainingController::class, 'previewCert']);
+        Route::get('/hris/training/participants/{id}/download-cert', [\App\Http\Controllers\Api\HrisTrainingController::class, 'downloadCert']);
+        
+        Route::get('/hris/requests/{id}/preview-attachment', [\App\Http\Controllers\Api\HrisRequestController::class, 'previewAttachment']);
+        Route::get('/hris/requests/{id}/download-attachment', [\App\Http\Controllers\Api\HrisRequestController::class, 'downloadAttachment']);
+        
+        Route::get('/hris/news/{id}/banner', [\App\Http\Controllers\Api\HrisNewsController::class, 'previewBanner']);
+
+        Route::prefix('hris')->group(function () {
+        // HRIS Shift & Attendance Settings Routes
+        Route::get('/attendance-settings', [\App\Http\Controllers\Api\AttendanceController::class, 'getSettings']);
+        Route::post('/attendance-settings', [\App\Http\Controllers\Api\AttendanceController::class, 'saveSettings']);
+
+        Route::get('/shifts', [\App\Http\Controllers\Api\HrisShiftController::class, 'index']);
+        Route::post('/shifts', [\App\Http\Controllers\Api\HrisShiftController::class, 'store']);
+        Route::put('/shifts/{id}', [\App\Http\Controllers\Api\HrisShiftController::class, 'update']);
+        Route::delete('/shifts/{id}', [\App\Http\Controllers\Api\HrisShiftController::class, 'destroy']);
+
+        Route::get('/shift-assignments', [\App\Http\Controllers\Api\HrisShiftController::class, 'getAssignments']);
+        Route::post('/shift-assignments', [\App\Http\Controllers\Api\HrisShiftController::class, 'assignShifts']);
+        Route::post('/shift-assignments/auto-generate', [\App\Http\Controllers\Api\HrisShiftController::class, 'autoGenerate']);
+        Route::post('/shift-assignments/swap', [\App\Http\Controllers\Api\HrisShiftController::class, 'swapShifts']);
+        Route::delete('/shift-assignments/{id}', [\App\Http\Controllers\Api\HrisShiftController::class, 'deleteAssignment']);
+
         // 1. Slip Gaji (Bulanan & Harian)
         Route::get('/payrolls', [App\Http\Controllers\Api\HrisPayrollController::class, 'index']);
         Route::post('/payrolls/generate-monthly', [App\Http\Controllers\Api\HrisPayrollController::class, 'generateMonthly']);
@@ -168,13 +221,22 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/adjustments/items/{id}', [App\Http\Controllers\Api\HrisPayrollMasterController::class, 'deleteAdjustmentItem']);
 
         // 7. Pengajuan (HRIS Requests)
+        Route::get('/requests/summary', [\App\Http\Controllers\Api\HrisRequestController::class, 'summary']);
         Route::get('/requests', [\App\Http\Controllers\Api\HrisRequestController::class, 'index']);
+        // Route::get('/requests', [\App\Http\Controllers\Api\HrisRequestController::class, 'index']);
         Route::post('/requests', [\App\Http\Controllers\Api\HrisRequestController::class, 'store']);
         Route::post('/requests/{id}/approve', [\App\Http\Controllers\Api\HrisRequestController::class, 'approve']);
         Route::post('/requests/{id}/reject', [\App\Http\Controllers\Api\HrisRequestController::class, 'reject']);
         Route::delete('/requests/{id}', [\App\Http\Controllers\Api\HrisRequestController::class, 'destroy']);
 
         // 8. Pengaturan Cuti (Leave Types & Balances)
+                Route::get('/hris/request-policies', [\App\Http\Controllers\Api\HrisLeaveSettingController::class, 'getPolicies']);
+        Route::post('/hris/request-policies', [\App\Http\Controllers\Api\HrisLeaveSettingController::class, 'savePolicy']);
+        Route::get('/hris/leave-types', [\App\Http\Controllers\Api\HrisLeaveSettingController::class, 'getLeaveTypes']);
+        Route::post('/hris/leave-types', [\App\Http\Controllers\Api\HrisLeaveSettingController::class, 'storeLeaveType']);
+        Route::delete('/hris/leave-types/{id}', [\App\Http\Controllers\Api\HrisLeaveSettingController::class, 'deleteLeaveType']);
+        Route::get('/hris/leave-balances', [\App\Http\Controllers\Api\HrisLeaveSettingController::class, 'getLeaveBalances']);
+        Route::put('/hris/leave-balances/{id}', [\App\Http\Controllers\Api\HrisLeaveSettingController::class, 'updateLeaveBalance']);
         Route::get('/leave-types', [\App\Http\Controllers\Api\HrisLeaveSettingController::class, 'getLeaveTypes']);
         Route::post('/leave-types', [\App\Http\Controllers\Api\HrisLeaveSettingController::class, 'storeLeaveType']);
         Route::delete('/leave-types/{id}', [\App\Http\Controllers\Api\HrisLeaveSettingController::class, 'deleteLeaveType']);
@@ -210,6 +272,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/assets/{id}', [\App\Http\Controllers\Api\HrisAssetController::class, 'update']);
         Route::post('/assets/{id}/assign', [\App\Http\Controllers\Api\HrisAssetController::class, 'assign']);
         Route::post('/assets/{id}/return', [\App\Http\Controllers\Api\HrisAssetController::class, 'returnAsset']);
+        Route::post('/assets/{id}/report-damage', [\App\Http\Controllers\Api\HrisAssetController::class, 'reportDamage']);
+        Route::post('/assets/{id}/maintenance-status', [\App\Http\Controllers\Api\HrisAssetController::class, 'updateMaintenanceStatus']);
         Route::delete('/assets/{id}', [\App\Http\Controllers\Api\HrisAssetController::class, 'destroy']);
 
         // 12. Pinjaman & Kasbon (Loans)
@@ -226,6 +290,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/news', [\App\Http\Controllers\Api\HrisNewsController::class, 'store']);
         Route::put('/news/{id}', [\App\Http\Controllers\Api\HrisNewsController::class, 'update']);
         Route::post('/news/{id}/toggle-publish', [\App\Http\Controllers\Api\HrisNewsController::class, 'togglePublish']);
+        Route::post('/news/{id}/view', [\App\Http\Controllers\Api\HrisNewsController::class, 'incrementView']);
+        Route::get('/news/{id}', [\App\Http\Controllers\Api\HrisNewsController::class, 'show']);
         Route::delete('/news/{id}', [\App\Http\Controllers\Api\HrisNewsController::class, 'destroy']);
 
         // 14. KPI & Evaluasi Kinerja (Performance Appraisals)
@@ -237,10 +303,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/performance/{id}/finalize', [\App\Http\Controllers\Api\HrisPerformanceController::class, 'finalizeReview']);
         Route::delete('/performance/{id}', [\App\Http\Controllers\Api\HrisPerformanceController::class, 'destroy']);
 
-          // 15. Digital Documents (Brankas Berkas Karyawan)
+                    // 15. Digital Documents (Brankas Berkas Karyawan)
           Route::get('/documents/summary', [\App\Http\Controllers\Api\HrisDocumentController::class, 'summary']);
           Route::get('/documents', [\App\Http\Controllers\Api\HrisDocumentController::class, 'index']);
           Route::post('/documents', [\App\Http\Controllers\Api\HrisDocumentController::class, 'store']);
+          Route::get('/documents/{id}/preview', [\App\Http\Controllers\Api\HrisDocumentController::class, 'preview']);
+          Route::get('/documents/{id}/download', [\App\Http\Controllers\Api\HrisDocumentController::class, 'download']);
           Route::put('/documents/{id}', [\App\Http\Controllers\Api\HrisDocumentController::class, 'update']);
           Route::post('/documents/{id}/verify', [\App\Http\Controllers\Api\HrisDocumentController::class, 'verify']);
           Route::delete('/documents/{id}', [\App\Http\Controllers\Api\HrisDocumentController::class, 'destroy']);
@@ -257,7 +325,40 @@ Route::middleware('auth:sanctum')->group(function () {
           Route::post('/violations/{id}/revoke', [\App\Http\Controllers\Api\HrisViolationController::class, 'revoke']);
           Route::delete('/violations/{id}', [\App\Http\Controllers\Api\HrisViolationController::class, 'destroy']);
 
-          // 17. Compliance & Alerts (Legalitas SIM, STNK, KIR, K3)
+          
+        // HRIS Compliance & Alerts (Legalitas SIM, STNK, KIR, Sertifikasi)
+        Route::get('/hris/compliance/summary', [\App\Http\Controllers\Api\HrisComplianceController::class, 'summary']);
+        Route::get('/hris/compliance', [\App\Http\Controllers\Api\HrisComplianceController::class, 'index']);
+        Route::post('/hris/compliance', [\App\Http\Controllers\Api\HrisComplianceController::class, 'store']);
+        Route::get('/hris/compliance/{id}', [\App\Http\Controllers\Api\HrisComplianceController::class, 'show']);
+        Route::put('/hris/compliance/{id}', [\App\Http\Controllers\Api\HrisComplianceController::class, 'update']);
+        Route::post('/hris/compliance/{id}/renew', [\App\Http\Controllers\Api\HrisComplianceController::class, 'renew']);
+        Route::delete('/hris/compliance/{id}', [\App\Http\Controllers\Api\HrisComplianceController::class, 'destroy']);
+        Route::get('/hris/compliance/{id}/preview', [\App\Http\Controllers\Api\HrisComplianceController::class, 'previewDoc']);
+        Route::get('/hris/compliance/{id}/download', [\App\Http\Controllers\Api\HrisComplianceController::class, 'downloadDoc']);
+
+        // HRIS Compliance Doc Types
+        Route::get('/hris/compliance-doc-types', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'getComplianceDocTypes']);
+        Route::post('/hris/compliance-doc-types', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'storeComplianceDocType']);
+        Route::put('/hris/compliance-doc-types/{id}', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'updateComplianceDocType']);
+        Route::delete('/hris/compliance-doc-types/{id}', [\App\Http\Controllers\Api\HrisMasterSettingController::class, 'deleteComplianceDocType']);
+
+        // HRIS Violations & Sanctions (Kedisiplinan, Sanksi & Surat Peringatan)
+        Route::get('/hris/violations/summary', [\App\Http\Controllers\Api\HrisViolationController::class, 'summary']);
+        Route::get('/hris/violations/types', [\App\Http\Controllers\Api\HrisViolationController::class, 'getViolationTypes']);
+        Route::post('/hris/violations/types', [\App\Http\Controllers\Api\HrisViolationController::class, 'storeViolationType']);
+        Route::put('/hris/violations/types/{id}', [\App\Http\Controllers\Api\HrisViolationController::class, 'storeViolationType']);
+        Route::delete('/hris/violations/types/{id}', [\App\Http\Controllers\Api\HrisViolationController::class, 'deleteViolationType']);
+        Route::get('/hris/violations', [\App\Http\Controllers\Api\HrisViolationController::class, 'index']);
+        Route::post('/hris/violations', [\App\Http\Controllers\Api\HrisViolationController::class, 'store']);
+        Route::get('/hris/violations/{id}', [\App\Http\Controllers\Api\HrisViolationController::class, 'show']);
+        Route::put('/hris/violations/{id}', [\App\Http\Controllers\Api\HrisViolationController::class, 'update']);
+        Route::post('/hris/violations/{id}/revoke', [\App\Http\Controllers\Api\HrisViolationController::class, 'revoke']);
+        Route::delete('/hris/violations/{id}', [\App\Http\Controllers\Api\HrisViolationController::class, 'destroy']);
+        Route::get('/hris/violations/{id}/preview', [\App\Http\Controllers\Api\HrisViolationController::class, 'previewEvidence']);
+        Route::get('/hris/violations/{id}/download', [\App\Http\Controllers\Api\HrisViolationController::class, 'downloadEvidence']);
+
+        // 17. Compliance & Alerts (Legalitas SIM, STNK, KIR, K3)
           
         
         // Master Settings: Training Categories, KPI Periods, Compliance Doc Types, Asset Categories
@@ -298,8 +399,35 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/mutations/summary', [\App\Http\Controllers\Api\HrisMutationController::class, 'summary']);
         Route::apiResource('/mutations', \App\Http\Controllers\Api\HrisMutationController::class);
 
+        
+        // Resign Karyawan
+        Route::get('/resignations/summary', [\App\Http\Controllers\Api\HrisResignationController::class, 'summary']);
+        Route::apiResource('/resignations', \App\Http\Controllers\Api\HrisResignationController::class);
+
         // Kontrak Kerja
         Route::apiResource('/contract-types', \App\Http\Controllers\Api\HrisContractTypeController::class);
+        
+        // HRIS Contracts with and without /hris/ prefix
+        Route::get('/hris/contracts/summary', [\App\Http\Controllers\Api\HrisContractController::class, 'summary']);
+        Route::get('/hris/contracts/{id}/download', [\App\Http\Controllers\Api\HrisContractController::class, 'downloadPdf']);
+        Route::get('/hris/contracts', [\App\Http\Controllers\Api\HrisContractController::class, 'index']);
+        Route::post('/hris/contracts', [\App\Http\Controllers\Api\HrisContractController::class, 'store']);
+        Route::get('/hris/contracts/{id}', [\App\Http\Controllers\Api\HrisContractController::class, 'show']);
+        Route::put('/hris/contracts/{id}', [\App\Http\Controllers\Api\HrisContractController::class, 'update']);
+        Route::delete('/hris/contracts/{id}', [\App\Http\Controllers\Api\HrisContractController::class, 'destroy']);
+
+        // HRIS Allowances with /hris/ prefix
+        Route::get('/hris/allowance-types', [\App\Http\Controllers\Api\HrisPayrollMasterController::class, 'getAllowanceTypes']);
+        Route::post('/hris/allowance-types', [\App\Http\Controllers\Api\HrisPayrollMasterController::class, 'storeAllowanceType']);
+        Route::delete('/hris/allowance-types/{id}', [\App\Http\Controllers\Api\HrisPayrollMasterController::class, 'deleteAllowanceType']);
+        Route::get('/hris/allowances', [\App\Http\Controllers\Api\HrisPayrollMasterController::class, 'getEmployeeAllowances']);
+        Route::post('/hris/allowances', [\App\Http\Controllers\Api\HrisPayrollMasterController::class, 'storeEmployeeAllowance']);
+        Route::delete('/hris/allowances/{id}', [\App\Http\Controllers\Api\HrisPayrollMasterController::class, 'deleteEmployeeAllowance']);
+
+        // HRIS Payroll Reports (Encrypted Batch Report & On-the-fly Individual Payslip)
+        Route::get('/hris/payrolls/{id}/batch-report', [\App\Http\Controllers\Api\HrisPayrollController::class, 'downloadBatchReport']);
+        Route::get('/hris/payrolls/payslips/{id}/download-pdf', [\App\Http\Controllers\Api\HrisPayrollController::class, 'downloadIndividualPayslipPdf']);
+
         Route::get('/contracts/summary', [\App\Http\Controllers\Api\HrisContractController::class, 'summary']);
         Route::get('/contracts/{id}/download', [\App\Http\Controllers\Api\HrisContractController::class, 'downloadPdf']);
         Route::get('/contracts', [\App\Http\Controllers\Api\HrisContractController::class, 'index']);
@@ -385,3 +513,7 @@ Route::fallback(fn() => response()->json(['message' => 'API endpoint not found']
 
 
 
+
+// Direct Token & Auth Download for HRIS Payrolls (Admin & Employee)
+Route::get('/hris/payrolls/{id}/batch-report', [\App\Http\Controllers\Api\HrisPayrollController::class, 'downloadBatchReport']);
+Route::get('/hris/payrolls/payslips/{id}/download-pdf', [\App\Http\Controllers\Api\HrisPayrollController::class, 'downloadIndividualPayslipPdf']);

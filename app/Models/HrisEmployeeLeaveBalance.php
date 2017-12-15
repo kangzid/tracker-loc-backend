@@ -15,6 +15,7 @@ class HrisEmployeeLeaveBalance extends Model
         'tenant_id',
         'employee_id',
         'leave_type_id',
+        'category',
         'year',
         'quota',
         'used',
@@ -27,6 +28,30 @@ class HrisEmployeeLeaveBalance extends Model
         'used' => 'integer',
         'remaining' => 'integer',
     ];
+
+    protected $appends = ['remaining_days'];
+
+    protected static function booted()
+    {
+        static::saving(function ($balance) {
+            $quota = (int)($balance->quota ?? 0);
+            $used = (int)($balance->used ?? 0);
+            $balance->remaining = max(0, $quota - $used);
+            if (empty($balance->category)) {
+                $balance->category = 'leave';
+            }
+        });
+    }
+
+    public function getRemainingDaysAttribute()
+    {
+        return max(0, (int)($this->quota ?? 0) - (int)($this->used ?? 0));
+    }
+
+    public function getRemainingAttribute($value)
+    {
+        return max(0, (int)($this->quota ?? 0) - (int)($this->used ?? 0));
+    }
 
     public function employee()
     {

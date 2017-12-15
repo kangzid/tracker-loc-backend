@@ -137,7 +137,7 @@ class TaskController extends Controller
 
     public function show(Request $request, $id)
     {
-        $task = Task::with(['employee.user', 'assignedBy'])->findOrFail($id);
+        $task = Task::with(['employee.user', 'assignedBy', 'vehicle'])->findOrFail($id);
         $user = $request->user();
 
         // Tenant isolation: Admin can only view tasks from their organization, Employee can only view their own tasks

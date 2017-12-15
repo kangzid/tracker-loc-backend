@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Employee;
+use App\Services\EncryptedStorageService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -34,11 +35,16 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
+        $photoPath = $user->photo_path ?: ($user->employee ? $user->employee->photo_path : null);
+        $photoBase64 = $photoPath ? EncryptedStorageService::getBase64($photoPath) : null;
+
         $userData = [
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
             'role' => $user->role,
+            'photo_path' => $user->photo_path,
+            'photo_base64' => $photoBase64,
             'is_active' => $user->is_active,
             'created_at' => $user->created_at,
             'updated_at' => $user->updated_at,
@@ -46,7 +52,9 @@ class AuthController extends Controller
 
         // Add employee data if user is employee
         if ($user->role === 'employee' && $user->employee) {
-            $userData['employee'] = $user->employee;
+            $emp = $user->employee;
+            $emp->photo_base64 = $photoBase64;
+            $userData['employee'] = $emp;
         }
 
         return response()->json([
@@ -109,7 +117,85 @@ class AuthController extends Controller
 
     public function profile(Request $request)
     {
-        return response()->json($request->user()->load('employee'));
+        $user = $request->user()->load('employee');
+        $photoPath = $user->photo_path ?: ($user->employee ? $user->employee->photo_path : null);
+        if ($photoPath) {
+            $user->photo_base64 = EncryptedStorageService::getBase64($photoPath);
+            if ($user->employee) {
+                $user->employee->photo_base64 = $user->photo_base64;
+            }
+        }
+        return response()->json($user);
+    }
+
+    
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email,' . $user->id,
+            'phone' => 'nullable|string|max:50',
+            'password' => 'nullable|string|min:8',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $user->name = $request->name;
+        $user->email = $request->email;
+
+        if ($request->filled('password')) {
+            $user->password = Hash::make($request->password);
+        }
+
+        $tenantId = $user->isAdmin() ? $user->id : ($user->admin_id ?? 1);
+
+                $oldPath = $user->photo_path ?: ($user->employee ? $user->employee->photo_path : null);
+        if ($request->has('photo_base64')) {
+            if (empty($request->photo_base64)) {
+                if ($oldPath) {
+                    EncryptedStorageService::deleteFile($oldPath);
+                }
+                $user->photo_path = null;
+                if ($user->employee) {
+                    $user->employee->photo_path = null;
+                    $user->employee->save();
+                }
+            } elseif (str_starts_with($request->photo_base64, 'data:image')) {
+                if ($oldPath) {
+                    EncryptedStorageService::deleteFile($oldPath);
+                }
+                $stored = EncryptedStorageService::storeEncrypted(
+                    $request->photo_base64,
+                    $tenantId,
+                    'avatars',
+                    'avatar_admin_' . $user->id
+                );
+                $user->photo_path = $stored['path'];
+                if ($user->employee) {
+                    $user->employee->photo_path = $stored['path'];
+                    $user->employee->save();
+                }
+            }
+        }
+        $user->save();
+
+        if ($user->employee) {
+            $empData = [];
+            if ($request->has('phone')) $empData['phone'] = $request->phone;
+            if ($user->photo_path) $empData['photo_path'] = $user->photo_path;
+            if (!empty($empData)) {
+                $user->employee->update($empData);
+            }
+        }
+
+        return response()->json([
+            'message' => 'Profil berhasil diperbarui.',
+            'user' => $user->load('employee')
+        ]);
     }
 
     public function changePassword(Request $request)

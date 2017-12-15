@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
+use App\Services\EncryptedStorageService;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -123,6 +124,36 @@ class EmployeeController extends Controller
             'position' => 'nullable|string',
         ]);
 
+                        // Handle photo upload or removal with storage deletion
+        if ($request->has('photo_base64')) {
+            $oldPath = $employee->photo_path ?: ($employee->user ? $employee->user->photo_path : null);
+            if (empty($request->photo_base64)) {
+                if ($oldPath) {
+                    EncryptedStorageService::deleteFile($oldPath);
+                }
+                $employee->photo_path = null;
+                if ($employee->user) {
+                    $employee->user->photo_path = null;
+                    $employee->user->save();
+                }
+            } elseif (str_starts_with($request->photo_base64, 'data:image')) {
+                if ($oldPath) {
+                    EncryptedStorageService::deleteFile($oldPath);
+                }
+                $stored = EncryptedStorageService::storeEncrypted(
+                    $request->photo_base64,
+                    $adminId,
+                    'avatars',
+                    'avatar_' . ($employee->employee_id ?: $employee->id)
+                );
+                $employee->photo_path = $stored['path'];
+                if ($employee->user) {
+                    $employee->user->photo_path = $stored['path'];
+                    $employee->user->save();
+                }
+            }
+        }
+
         // Update user data if provided
         if ($request->has('name') || $request->has('email') || $request->has('password')) {
             $userData = array_filter([
@@ -130,8 +161,7 @@ class EmployeeController extends Controller
                 'email' => $request->email,
             ]);
             
-            // Allow admin to force update password if provided
-            if ($request->has('password')) {
+            if ($request->has('password') && !empty($request->password)) {
                 $userData['password'] = Hash::make($request->password);
             }
 
@@ -139,31 +169,44 @@ class EmployeeController extends Controller
         }
 
         // Update employee data
-        $employee->update(array_filter([
-            'employee_id' => $request->employee_id,
+        $updateFields = [
             'phone' => $request->phone,
             'address' => $request->address,
             'department' => $request->department,
             'position' => $request->position,
-            'photo_base64' => $request->photo_base64,
-        ]));
+            'photo_path' => $employee->photo_path,
+        ];
+        if ($request->has('employee_id') && !empty($request->employee_id)) {
+            $updateFields['employee_id'] = $request->employee_id;
+        }
+
+        $employee->update($updateFields);
 
         return response()->json($employee->load('user'));
     }
 
     
-            public function getComprehensiveProfile(Request $request, $id)
+                public function getComprehensiveProfile(Request $request, $id)
     {
-        $adminId = $request->user()->isAdmin() ? $request->user()->id : ($request->user()->admin_id ?? $request->user()->id);
+        $user = $request->user();
+        $isAdmin = $user->isAdmin();
+        $adminId = $isAdmin ? $user->id : ($user->admin_id ?? 2);
         
-        $employee = Employee::with('user')
-            ->where('admin_id', $adminId)
-            ->where(function($q) use ($id) {
-                $q->where('id', $id)
-                  ->orWhere('employee_id', $id)
-                  ->orWhere('user_id', $id);
-            })
-            ->first();
+        $employee = null;
+        if ($id === 'me' || ($user->role === 'employee' && ($user->employee && $user->employee->id == $id))) {
+            $employee = $user->employee ? $user->employee->load('user') : null;
+        }
+
+        if (!$employee) {
+            $employee = Employee::with('user')
+                ->where('admin_id', $adminId)
+                ->where(function($q) use ($id) {
+                    $q->where('id', $id)
+                      ->orWhere('employee_id', $id)
+                      ->orWhere('user_id', $id);
+                })
+                ->first();
+        }
 
         if (!$employee) {
             $employee = Employee::with('user')
@@ -179,10 +222,21 @@ class EmployeeController extends Controller
             return response()->json(['message' => 'Data karyawan tidak ditemukan.'], 404);
         }
 
-        $tenantId = $employee->admin_id;
+        $tenantId = $employee->admin_id ?? $adminId;
 
-        // 1. Documents
-        $documents = \App\Models\HrisDocument::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->get();
+        // Photo Base64 resolution
+        $photoPath = $employee->photo_path ?: ($employee->user ? $employee->user->photo_path : null);
+        if ($photoPath) {
+            $employee->photo_base64 = EncryptedStorageService::getBase64($photoPath);
+            if ($employee->user) {
+                $employee->user->photo_base64 = $employee->photo_base64;
+            }
+        }
+
+        // 1. Documents (Only for Admin / HRD, excluded for employee privacy)
+        $documents = $isAdmin 
+            ? \App\Models\HrisDocument::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->get()
+            : [];
 
         // 2. Performance Reviews
         $performanceReviews = \App\Models\HrisPerformanceReview::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->orderBy('created_at', 'desc')->get();
@@ -205,13 +259,12 @@ class EmployeeController extends Controller
         // 8. Training & Certifications
         $trainings = \App\Models\HrisTrainingParticipant::with('training')->where('employee_id', $employee->id)->get();
 
-        // 9. Compliance Items
+        // 9. Compliance Items (SIM, SKCK, Sertifikasi)
         $complianceItems = \App\Models\HrisComplianceItem::where('tenant_id', $tenantId)->where('target_type', 'employee')->where('target_id', $employee->id)->get();
 
         // 10. Pengajuan Cuti / Izin
         $requests = \App\Models\HrisRequest::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->orderBy('created_at', 'desc')->take(10)->get();
 
-        
         // 11. Contracts & Active Contract Data
         $contracts = \App\Models\HrisContract::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->orderBy('created_at', 'desc')->get();
         $activeContract = $contracts->firstWhere('status', 'active') ?: $contracts->first();
@@ -231,8 +284,18 @@ class EmployeeController extends Controller
         $allowances = \App\Models\HrisEmployeeAllowance::with('items.allowanceType')->where('tenant_id', $tenantId)->where('employee_id', $employee->id)->first();
         $contractAllowances = $activeContract ? ($activeContract->allowances_json ?: []) : [];
 
+        $totalAllowancesAmount = 0;
+        if (!empty($contractAllowances)) {
+            foreach ($contractAllowances as $ca) {
+                $totalAllowancesAmount += (float) ($ca['amount'] ?? 0);
+            }
+        } elseif ($allowances) {
+            $totalAllowancesAmount = (float) ($allowances->total_amount ?? 0);
+        }
+
         $bpjs = \App\Models\HrisEmployeeBpjs::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->first();
         $mutations = \App\Models\HrisMutation::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->orderBy('effective_date', 'desc')->get();
+        $resignation = \App\Models\HrisResignation::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->latest()->first();
 
         return response()->json([
             'employee' => $employee,
@@ -249,12 +312,15 @@ class EmployeeController extends Controller
             'salary' => $salary,
             'allowances' => $allowances,
             'contract_allowances' => $contractAllowances,
+            'total_allowances_amount' => $totalAllowancesAmount,
             'bpjs' => $bpjs,
             'contracts' => $contracts,
             'mutations' => $mutations,
+            'resignation' => $resignation,
         ]);
-
     }
+
+    
 
 public function destroy(Request $request, $id)
     {
@@ -269,10 +335,38 @@ public function destroy(Request $request, $id)
             return response()->json(['message' => 'Employee not found'], 404);
         }
 
-        $user = $employee->user;
+                $user = $employee->user;
+        if ($employee->photo_path) {
+            EncryptedStorageService::deleteFile($employee->photo_path);
+        }
+        if ($user && $user->photo_path && $user->photo_path !== $employee->photo_path) {
+            EncryptedStorageService::deleteFile($user->photo_path);
+        }
         $employee->delete();
-        $user->delete();
+        if ($user) $user->delete();
 
         return response()->json(['message' => 'Employee deleted successfully']);
     }
+
+            public function photo(Request $request, $id)
+    {
+        $employee = Employee::with('user')->find($id);
+
+        if (!$employee) {
+            return response()->json(['message' => 'Karyawan tidak ditemukan.'], 404);
+        }
+
+        $photoPath = $employee->photo_path ?: ($employee->user ? $employee->user->photo_path : null);
+
+        if (!$photoPath) {
+            return response()->json(['message' => 'Foto profil tidak ditemukan.'], 404);
+        }
+
+        try {
+            return EncryptedStorageService::streamResponse($photoPath, 'photo_' . $employee->employee_id, false);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Berkas foto tidak ditemukan di penyimpanan server.'], 404);
+        }
+    }
+
 }

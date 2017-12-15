@@ -18,7 +18,7 @@ class HrisTrainingParticipant extends Model
         'score',
         'passed',
         'certificate_number',
-        'certificate_base64',
+        'certificate_path', 'certificate_name',
         'notes',
     ];
 

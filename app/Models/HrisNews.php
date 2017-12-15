@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Services\EncryptedStorageService;
 
 class HrisNews extends Model
 {
@@ -16,10 +17,11 @@ class HrisNews extends Model
         'title',
         'category',
         'content',
-        'banner_base64',
+        'banner_path',
         'priority',
         'target_audience',
         'is_published',
+        'views',
         'published_at',
         'created_by',
     ];
@@ -27,7 +29,29 @@ class HrisNews extends Model
     protected $casts = [
         'is_published' => 'boolean',
         'published_at' => 'datetime',
+        'views' => 'integer',
     ];
+
+    protected $appends = [
+        'banner_base64',
+        'banner_url',
+    ];
+
+    public function getBannerBase64Attribute()
+    {
+        if ($this->banner_path) {
+            return EncryptedStorageService::getBase64($this->banner_path);
+        }
+        return null;
+    }
+
+    public function getBannerUrlAttribute()
+    {
+        if ($this->banner_path) {
+            return url("/api/hris/news/{$this->id}/banner");
+        }
+        return null;
+    }
 
     public function author()
     {

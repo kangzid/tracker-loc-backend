@@ -20,7 +20,7 @@ class HrisClaim extends Model
         'claim_date',
         'amount',
         'description',
-        'receipt_base64',
+        'receipt_path',
         'receipt_name',
         'status',
         'approved_by',

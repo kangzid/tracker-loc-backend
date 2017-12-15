@@ -21,7 +21,7 @@ class Employee extends Model
         'longitude',
         'last_location_update',
         'basic_salary',
-        'photo_base64',
+        'photo_path',
     ];
 
     protected static function boot()
@@ -63,6 +63,11 @@ class Employee extends Model
         return $this->hasMany(Attendance::class);
     }
 
+    public function loans()
+    {
+        return $this->hasMany(HrisLoan::class, 'employee_id');
+    }
+
     public function tasks()
     {
         return $this->hasMany(Task::class, 'assigned_to');
@@ -77,4 +82,17 @@ class Employee extends Model
     {
         return $this->morphOne(Location::class, 'trackable')->latest('recorded_at');
     }
+
+    public function shiftAssignments()
+    {
+        return $this->hasMany(HrisShiftAssignment::class, 'employee_id');
+    }
+
+    public function todayShift($date = null)
+    {
+        $targetDate = $date ?: \Carbon\Carbon::today()->format('Y-m-d');
+        $assignment = $this->shiftAssignments()->where('date', $targetDate)->with('shift')->first();
+        return $assignment ? $assignment->shift : null;
+    }
+
 }

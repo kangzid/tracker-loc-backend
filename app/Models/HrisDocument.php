@@ -11,12 +11,14 @@ class HrisDocument extends Model
 
     protected $table = 'hris_documents';
 
-    protected $fillable = [
+        protected $fillable = [
         'tenant_id',
         'employee_id',
         'title',
         'category',
-        'file_base64',
+        'document_name',
+        'document_path',
+        'document_path',
         'file_name',
         'file_type',
         'file_size_kb',

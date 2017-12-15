@@ -4,7 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;
+use App\Models\Employee;
 use App\Models\Geofence;
+use App\Models\HrisAttendanceSetting;
+use App\Models\HrisShift;
+use App\Models\HrisShiftAssignment;
 use App\Services\GeofenceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -20,32 +24,35 @@ class AttendanceController extends Controller
     {
         $this->geofenceService = $geofenceService;
     }
+
     public function index(Request $request)
     {
         $user = $request->user();
 
         if ($user->isAdmin()) {
             $adminId = $user->id;
-            // OPTIMIZATION: Use eager loading to prevent N+1 queries
-            $attendances = Attendance::with(['employee' => function($query) {
+            $attendances = Attendance::with([
+                'employee' => function($query) {
                     $query->select('id', 'user_id', 'admin_id', 'employee_id', 'department', 'position');
-                }, 'employee.user' => function($query) {
+                }, 
+                'employee.user' => function($query) {
                     $query->select('id', 'name', 'email');
-                }])
-                ->whereHas('employee', function ($q) use ($adminId) {
-                    $q->where('admin_id', $adminId);
-                })
-                ->orderBy('date', 'desc')
-                ->paginate(20);
+                },
+                'shift:id,name,code,color,work_start_time,work_end_time'
+            ])
+            ->whereHas('employee', function ($q) use ($adminId) {
+                $q->where('admin_id', $adminId);
+            })
+            ->orderBy('date', 'desc')
+            ->paginate(20);
         } else {
-            // Employee can only see their own attendances
             $employee = $user->employee;
             if (!$employee) {
                 return response()->json(['message' => 'Employee profile not found'], 404);
             }
 
-            // OPTIMIZATION: Use query scope
             $attendances = Attendance::forEmployee($employee->id)
+                ->with('shift:id,name,code,color,work_start_time,work_end_time')
                 ->orderBy('date', 'desc')
                 ->paginate(20);
         }
@@ -70,54 +77,105 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'Employee profile not found'], 404);
         }
 
-        // OPTIMIZATION: Use cached geofence service
+        $adminId = $employee->admin_id;
+
+        // 1. Geofence verification
         $isInOffice = $this->geofenceService->isInsideGeofence(
             $request->latitude, 
             $request->longitude, 
-            $employee->admin_id
+            $adminId
         );
 
-        // Return error if outside office area
         if (!$isInOffice) {
             return response()->json([
                 'error' => 'OUTSIDE_GEOFENCE',
                 'message' => 'Anda berada di luar area kantor. Silakan mendekat ke area kantor untuk melakukan absensi.',
-                'title' => 'Lokasi Tidak Valid'
+                'title' => 'Lokasi Di Luar Area Kantor'
             ], 422);
         }
+
+        // 2. Resolve Active Schedule (Shift or Regular)
+        $schedule = $this->getEffectiveSchedule($employee);
+        $now = Carbon::now();
+        $currentTimeStr = $now->format('H:i');
 
         $today = Carbon::today();
         $attendance = Attendance::firstOrCreate(
             ['employee_id' => $employee->id, 'date' => $today],
             [
-                'admin_id' => $employee->admin_id,
+                'admin_id' => $adminId,
                 'status' => 'present',
+                'shift_id' => $schedule['shift_id'],
             ]
         );
 
         if ($request->type === 'check_in') {
             if ($attendance->check_in) {
-                return response()->json(['message' => 'Already checked in today'], 400);
+                return response()->json([
+                    'error' => 'ALREADY_CHECKED_IN',
+                    'message' => 'Anda sudah melakukan absensi masuk hari ini pada pukul ' . Carbon::parse($attendance->check_in)->format('H:i') . ' WIB.',
+                ], 400);
             }
 
-            // Determine status based on time and location
-            $status = $this->determineAttendanceStatus($isInOffice);
+            // Check if too early
+            if ($schedule['check_in_start'] && $currentTimeStr < $schedule['check_in_start']) {
+                return response()->json([
+                    'error' => 'TOO_EARLY',
+                    'message' => "Belum waktu absensi masuk. Absen dibuka mulai pukul {$schedule['check_in_start']} WIB.",
+                    'title' => 'Absensi Belum Dibuka',
+                    'schedule' => $schedule,
+                ], 422);
+            }
+
+            // Check if past late cut-off limit and lock is enabled
+            if ($schedule['lock_after_late_cutoff'] && $schedule['check_in_end'] && $currentTimeStr > $schedule['check_in_end']) {
+                return response()->json([
+                    'error' => 'LOCKED_LATE_CUTOFF',
+                    'message' => "Batas waktu absensi masuk telah berakhir (pukul {$schedule['check_in_end']} WIB). Silakan hubungi HRD untuk konfirmasi kehadiran Anda.",
+                    'title' => 'Waktu Absensi Berakhir',
+                    'schedule' => $schedule,
+                ], 422);
+            }
+
+            // Determine status (Late or Present)
+            $threshold = $schedule['late_tolerance_time'] ?: $schedule['work_start_time'];
+            $status = 'present';
+            if ($threshold && $currentTimeStr > $threshold) {
+                $status = 'late';
+            }
 
             $attendance->update([
                 'check_in' => now(),
                 'check_in_lat' => $request->latitude,
                 'check_in_lng' => $request->longitude,
-                'status' => $status
+                'status' => $status,
+                'shift_id' => $schedule['shift_id'] ?: $attendance->shift_id,
             ]);
             
-            // Clear today's attendance cache
             Cache::forget("attendance:today:employee:{$employee->id}:" . Carbon::today()->format('Y-m-d'));
         } else {
+            // Check Out
             if (!$attendance->check_in) {
-                return response()->json(['message' => 'Must check in first'], 400);
+                return response()->json([
+                    'error' => 'MUST_CHECK_IN_FIRST',
+                    'message' => 'Anda harus melakukan absensi masuk terlebih dahulu.',
+                ], 400);
             }
             if ($attendance->check_out) {
-                return response()->json(['message' => 'Already checked out today'], 400);
+                return response()->json([
+                    'error' => 'ALREADY_CHECKED_OUT',
+                    'message' => 'Anda sudah melakukan absensi keluar hari ini pada pukul ' . Carbon::parse($attendance->check_out)->format('H:i') . ' WIB.',
+                ], 400);
+            }
+
+            // Verify if checkout before work end time is prohibited
+            if ($schedule['min_checkout_at_work_end'] && $schedule['work_end_time'] && $currentTimeStr < $schedule['work_end_time']) {
+                return response()->json([
+                    'error' => 'EARLY_CHECKOUT',
+                    'message' => "Belum waktu jam pulang kerja. Absen keluar dapat dilakukan mulai pukul {$schedule['work_end_time']} WIB.",
+                    'title' => 'Belum Jam Pulang',
+                    'schedule' => $schedule,
+                ], 422);
             }
 
             $attendance->update([
@@ -126,26 +184,26 @@ class AttendanceController extends Controller
                 'check_out_lng' => $request->longitude,
             ]);
             
-            // Clear today's attendance cache
             Cache::forget("attendance:today:employee:{$employee->id}:" . Carbon::today()->format('Y-m-d'));
         }
 
-        return response()->json($attendance);
+        return response()->json([
+            'message' => $request->type === 'check_in' ? 'Absensi masuk berhasil dicatat' : 'Absensi keluar berhasil dicatat',
+            'attendance' => $attendance->load('shift'),
+            'schedule' => $schedule,
+        ]);
     }
 
     public function show($id)
     {
         $user = auth()->user();
-        $attendance = Attendance::with('employee.user')->findOrFail($id);
+        $attendance = Attendance::with(['employee.user', 'shift'])->findOrFail($id);
 
-        // Check authorization
         if ($user->isAdmin()) {
-            // Admin can only view attendances of their employees
             if ($attendance->employee->admin_id !== $user->id) {
                 return response()->json(['message' => 'Unauthorized'], 403);
             }
         } else {
-            // Employee can only view their own attendance
             if (!$user->employee || $attendance->employee_id !== $user->employee->id) {
                 return response()->json(['message' => 'Unauthorized'], 403);
             }
@@ -154,6 +212,9 @@ class AttendanceController extends Controller
         return response()->json($attendance);
     }
 
+    /**
+     * Get Today Attendance & Schedule Window for Mobile App
+     */
     public function todayAttendance(Request $request)
     {
         $employee = $request->user()->employee;
@@ -161,16 +222,108 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'Employee profile not found'], 404);
         }
 
-        // OPTIMIZATION: Cache today's attendance for 5 minutes
-        $cacheKey = "attendance:today:employee:{$employee->id}:" . Carbon::today()->format('Y-m-d');
-        
-        $attendance = Cache::remember($cacheKey, 300, function () use ($employee) {
-            return Attendance::forEmployee($employee->id)
-                ->today()
-                ->first();
-        });
+        $todayStr = Carbon::today()->format('Y-m-d');
+        $attendance = Attendance::where('employee_id', $employee->id)
+            ->where('date', $todayStr)
+            ->with('shift')
+            ->first();
 
-        return response()->json($attendance);
+        $schedule = $this->getEffectiveSchedule($employee);
+        $now = Carbon::now();
+        $currentTimeStr = $now->format('H:i');
+
+        // Calculate Window Status & Permissions
+        $canCheckIn = false;
+        $canCheckOut = false;
+        $windowStatus = 'ontime';
+        $windowMessage = 'Waktu absensi dibuka.';
+
+        if (!$attendance || !$attendance->check_in) {
+            // Not checked in yet
+            if (!empty($schedule['is_day_off'])) {
+                $canCheckIn = true; // allow voluntary check-in / overtime
+                $windowStatus = 'day_off';
+                $windowMessage = "Hari ini adalah hari libur kerja Anda (Day Off).";
+            } elseif ($schedule['check_in_start'] && $currentTimeStr < $schedule['check_in_start']) {
+                $canCheckIn = false;
+                $windowStatus = 'too_early';
+                $windowMessage = "Absen masuk dibuka pukul {$schedule['check_in_start']} WIB.";
+            } elseif ($schedule['lock_after_late_cutoff'] && $schedule['check_in_end'] && $currentTimeStr > $schedule['check_in_end']) {
+                $canCheckIn = false;
+                $windowStatus = 'locked_late';
+                $windowMessage = "Batas waktu absensi masuk berakhir pukul {$schedule['check_in_end']} WIB. Hubungi HRD.";
+            } else {
+                $canCheckIn = true;
+                $threshold = $schedule['late_tolerance_time'] ?: $schedule['work_start_time'];
+                if ($threshold && $currentTimeStr > $threshold) {
+                    $windowStatus = 'late';
+                    $windowMessage = "Anda terlambat. Batas toleransi adalah {$threshold} WIB.";
+                } else {
+                    $windowStatus = 'ontime';
+                    $windowMessage = "Waktu absensi masuk normal.";
+                }
+            }
+        } elseif (!$attendance->check_out) {
+            // Already checked in, waiting for checkout
+            if ($schedule['min_checkout_at_work_end'] && $schedule['work_end_time'] && $currentTimeStr < $schedule['work_end_time']) {
+                $canCheckOut = false;
+                $windowStatus = 'checked_in_waiting_checkout';
+                $windowMessage = "Absen keluar dibuka mulai jam pulang pukul {$schedule['work_end_time']} WIB.";
+            } else {
+                $canCheckOut = true;
+                $windowStatus = 'ready_checkout';
+                $windowMessage = "Waktu absensi keluar telah dibuka.";
+            }
+        } else {
+            // Completed
+            $windowStatus = 'completed';
+            $windowMessage = "Absensi hari ini telah lengkap.";
+        }
+
+        // Compute Weekly Shift Roster for this Employee
+        $startOfWeek = Carbon::now()->startOfWeek(Carbon::MONDAY);
+        $weeklyRoster = [];
+        $dayNamesShort = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+        $dayNamesFull = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+
+        for ($i = 0; $i < 7; $i++) {
+            $currentDate = $startOfWeek->copy()->addDays($i);
+            $dateStr = $currentDate->format('Y-m-d');
+            $daySchedule = $this->getEffectiveSchedule($employee, $dateStr);
+
+            $weeklyRoster[] = [
+                'day_index' => $i,
+                'day_name' => $dayNamesShort[$i],
+                'day_full' => $dayNamesFull[$i],
+                'date' => $dateStr,
+                'date_day' => $currentDate->format('d'),
+                'is_today' => $dateStr === $todayStr,
+                'is_past' => $dateStr < $todayStr,
+                'is_shift' => $daySchedule['is_shift'],
+                'is_day_off' => $daySchedule['is_day_off'] ?? false,
+                'shift_id' => $daySchedule['shift_id'],
+                'shift_name' => $daySchedule['shift_name'],
+                'shift_code' => $daySchedule['shift_code'],
+                'color' => $daySchedule['color'],
+                'work_start_time' => $daySchedule['work_start_time'],
+                'work_end_time' => $daySchedule['work_end_time'],
+            ];
+        }
+
+        $monthNamesId = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+        $currentMonthLabel = $monthNamesId[$now->month - 1] . ' ' . $now->year;
+
+        return response()->json([
+            'attendance' => $attendance,
+            'schedule' => $schedule,
+            'weekly_roster' => $weeklyRoster,
+            'current_month_label' => $currentMonthLabel,
+            'can_check_in' => $canCheckIn,
+            'can_check_out' => $canCheckOut,
+            'window_status' => $windowStatus,
+            'window_message' => $windowMessage,
+            'server_time' => $now->toIso8601String(),
+        ]);
     }
 
     public function monthlyAttendance(Request $request)
@@ -180,8 +333,8 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'Employee profile not found'], 404);
         }
 
-        // OPTIMIZATION: Use query scope
         $attendances = Attendance::forEmployee($employee->id)
+            ->with('shift:id,name,code,color')
             ->thisMonth()
             ->orderBy('date', 'desc')
             ->get();
@@ -196,9 +349,8 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        // Verify employee belongs to this admin's tenant
         $adminId = $request->user()->id;
-        $employee = \App\Models\Employee::where('id', $employeeId)
+        $employee = Employee::where('id', $employeeId)
             ->where('admin_id', $adminId)
             ->first();
 
@@ -215,42 +367,64 @@ class AttendanceController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $month = $request->month ?? Carbon::now()->month;
-        $year = $request->year ?? Carbon::now()->year;
+        $month = (int) ($request->month ?? Carbon::now()->month);
+        $year = (int) ($request->year ?? Carbon::now()->year);
 
-        // Get all days in the month
         $daysInMonth = Carbon::create($year, $month)->daysInMonth;
-        $startDate = Carbon::create($year, $month, 1);
-        $endDate = Carbon::create($year, $month, $daysInMonth);
+        $startDate = Carbon::create($year, $month, 1)->startOfDay();
+        $endDate = Carbon::create($year, $month, $daysInMonth)->endOfDay();
 
-        $attendances = Attendance::with('employee.user')
+        $attendances = Attendance::with(['employee.user', 'shift'])
             ->where('employee_id', $employeeId)
-            ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+            ->whereBetween('date', [$startDate->format('Y-m-d 00:00:00'), $endDate->format('Y-m-d 23:59:59')])
             ->orderBy('date', 'asc')
             ->get();
 
-        // Create array with all days of the month
         $result = [];
         for ($day = 1; $day <= $daysInMonth; $day++) {
-            $date = Carbon::create($year, $month, $day)->format('Y-m-d');
-            // Find attendance by comparing formatted dates (handle timezone properly)
-            $attendance = $attendances->first(function ($item) use ($date) {
-                return $item->date->format('Y-m-d') === $date;
+            $carbonDate = Carbon::create($year, $month, $day);
+            $dateStr = $carbonDate->format('Y-m-d');
+            
+            $att = $attendances->first(function ($item) use ($dateStr) {
+                $itemDate = is_string($item->date) ? substr($item->date, 0, 10) : (is_object($item->date) ? $item->date->format('Y-m-d') : '');
+                return $itemDate === $dateStr;
             });
 
             $result[] = [
-                'date' => $date,
-                'day_name' => Carbon::create($year, $month, $day)->format('l'),
-                'attendance' => $attendance,
+                'date' => $dateStr,
+                'day_name' => $carbonDate->format('l'), // e.g. "Sunday", "Monday"
+                'attendance' => $att,
             ];
         }
 
         return response()->json([
+            'employee' => $employee->load('user'),
             'month' => $month,
             'year' => $year,
             'days_in_month' => $daysInMonth,
-            'attendances' => $result
+            'attendances' => $result,
+            'days' => $result,
         ]);
+    }
+
+    /**
+     * Helper to verify if an attendance date is within the tenant's modification limit window
+     */
+    private function checkDateModificationLimit($adminId, $targetDate, $actionName = 'memodifikasi')
+    {
+        $setting = HrisAttendanceSetting::where('tenant_id', $adminId)->first();
+        $limitDays = $setting ? (int) $setting->edit_delete_limit_days : 0;
+
+        if ($limitDays > 0) {
+            $parsedTarget = Carbon::parse($targetDate)->startOfDay();
+            $cutoffDate = Carbon::now()->startOfDay()->subDays($limitDays);
+
+            if ($parsedTarget->lt($cutoffDate)) {
+                return "Batas waktu telah terlewati. Anda hanya dapat {$actionName} absensi dalam rentang {$limitDays} hari terakhir.";
+            }
+        }
+
+        return null;
     }
 
     public function update(Request $request, $id)
@@ -261,45 +435,42 @@ class AttendanceController extends Controller
 
         $attendance = Attendance::findOrFail($id);
 
-        // Verify admin owns this attendance (via employee ownership)
         if ($attendance->employee->admin_id != $request->user()->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        // Configurable limit per tenant (0 = unlimited / unrestricted)
-        $setting = \App\Models\HrisAttendanceSetting::where('tenant_id', $request->user()->id)->first();
-        $limitDays = $setting ? $setting->edit_delete_limit_days : 0;
-        if ($limitDays > 0 && Carbon::parse($attendance->date)->diffInDays(Carbon::now()) > $limitDays) {
-            return response()->json(['message' => "Can only edit attendance within {$limitDays} days"], 403);
+        $limitError = $this->checkDateModificationLimit($request->user()->id, $attendance->date, 'mengedit');
+        if ($limitError) {
+            return response()->json(['message' => $limitError], 403);
         }
 
         $validator = Validator::make($request->all(), [
+            'status' => 'nullable|in:present,absent,late,early_leave,sakit,cuti,izin,dinas',
             'check_in' => 'nullable|date_format:H:i',
             'check_out' => 'nullable|date_format:H:i',
-            'status' => 'required|in:present,late,absent,sick,leave',
             'notes' => 'nullable|string|max:255',
+            'shift_id' => 'nullable|integer|exists:hris_shifts,id',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $updateData = [
-            'status' => $request->status,
-            'notes' => $request->notes,
-        ];
+        $updateData = [];
+        if ($request->status) $updateData['status'] = $request->status;
+        if ($request->has('notes')) $updateData['notes'] = $request->notes;
+        if ($request->has('shift_id')) $updateData['shift_id'] = $request->shift_id;
 
         if ($request->check_in) {
             $updateData['check_in'] = Carbon::parse(Carbon::parse($attendance->date)->format('Y-m-d') . ' ' . $request->check_in);
         }
-
         if ($request->check_out) {
             $updateData['check_out'] = Carbon::parse(Carbon::parse($attendance->date)->format('Y-m-d') . ' ' . $request->check_out);
         }
 
         $attendance->update($updateData);
 
-        return response()->json($attendance->load('employee.user'));
+        return response()->json($attendance->load(['employee.user', 'shift']));
     }
 
     public function destroy(Request $request, $id)
@@ -309,28 +480,20 @@ class AttendanceController extends Controller
         }
 
         $attendance = Attendance::findOrFail($id);
-
-        // Verify admin owns this attendance (via employee ownership)
         if ($attendance->employee->admin_id != $request->user()->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        // Configurable limit per tenant (0 = unlimited / unrestricted)
-        $setting = \App\Models\HrisAttendanceSetting::where('tenant_id', $request->user()->id)->first();
-        $limitDays = $setting ? $setting->edit_delete_limit_days : 0;
-        if ($limitDays > 0 && Carbon::parse($attendance->date)->diffInDays(Carbon::now()) > $limitDays) {
-            return response()->json(['message' => "Can only delete attendance within {$limitDays} days"], 403);
+        $limitError = $this->checkDateModificationLimit($request->user()->id, $attendance->date, 'menghapus');
+        if ($limitError) {
+            return response()->json(['message' => $limitError], 403);
         }
 
         $attendance->delete();
 
-        return response()->json(['message' => 'Attendance deleted successfully']);
+        return response()->json(['message' => 'Absensi berhasil dihapus']);
     }
 
-    /**
-     * Admin manual attendance creation for gap-filling
-     * Used when employee forgot to check-in or for manual corrections
-     */
     public function storeAdmin(Request $request)
     {
         if (!$request->user()->isAdmin()) {
@@ -340,19 +503,19 @@ class AttendanceController extends Controller
         $validator = Validator::make($request->all(), [
             'employee_id' => 'required|integer|exists:employees,id',
             'date' => 'required|date_format:Y-m-d',
-            'status' => 'required|in:present,absent,late,early_leave',
+            'status' => 'required|in:present,absent,late,early_leave,sakit,cuti,izin,dinas',
             'check_in' => 'nullable|date_format:H:i',
             'check_out' => 'nullable|date_format:H:i',
             'notes' => 'nullable|string|max:255',
+            'shift_id' => 'nullable|integer|exists:hris_shifts,id',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        // Verify employee belongs to this admin's tenant
         $adminId = $request->user()->id;
-        $employee = \App\Models\Employee::where('id', $request->employee_id)
+        $employee = Employee::where('id', $request->employee_id)
             ->where('admin_id', $adminId)
             ->first();
 
@@ -360,17 +523,20 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'Employee not found or does not belong to your tenant'], 404);
         }
 
-        // Check if attendance already exists for this date
+        $limitError = $this->checkDateModificationLimit($adminId, $request->date, 'menambah');
+        if ($limitError) {
+            return response()->json(['message' => $limitError], 403);
+        }
+
         $existingAttendance = Attendance::where('employee_id', $request->employee_id)
             ->where('date', $request->date)
             ->first();
 
         if ($existingAttendance) {
             return response()->json([
-                'message' => 'Attendance record already exists for this date',
+                'message' => 'Data absensi untuk tanggal ini sudah ada',
                 'date' => $request->date,
                 'existing_id' => $existingAttendance->id,
-                'note' => 'Use update endpoint to modify existing record'
             ], 409);
         }
 
@@ -380,14 +546,12 @@ class AttendanceController extends Controller
             'date' => $request->date,
             'status' => $request->status,
             'notes' => $request->notes,
+            'shift_id' => $request->shift_id,
         ];
 
-        // Add check-in if provided
         if ($request->check_in) {
             $attendanceData['check_in'] = Carbon::parse($request->date . ' ' . $request->check_in);
         }
-
-        // Add check-out if provided
         if ($request->check_out) {
             $attendanceData['check_out'] = Carbon::parse($request->date . ' ' . $request->check_out);
         }
@@ -395,8 +559,8 @@ class AttendanceController extends Controller
         $attendance = Attendance::create($attendanceData);
 
         return response()->json([
-            'message' => 'Attendance record created successfully',
-            'data' => $attendance->load('employee.user')
+            'message' => 'Data absensi berhasil dibuat',
+            'data' => $attendance->load(['employee.user', 'shift'])
         ], 201);
     }
 
@@ -416,7 +580,6 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'Employee profile not found'], 404);
         }
 
-        // OPTIMIZATION: Use cached geofence service
         $isInOffice = $this->geofenceService->isInsideGeofence(
             $request->latitude, 
             $request->longitude, 
@@ -425,20 +588,33 @@ class AttendanceController extends Controller
 
         return response()->json([
             'is_in_office' => $isInOffice,
-            'message' => $isInOffice ? 'Anda berada di area kantor' : 'Anda berada di luar area kantor'
+            'message' => $isInOffice ? 'Anda berada di dalam area kantor' : 'Anda berada di luar area kantor'
         ]);
     }
 
-    
     public function getSettings(Request $request)
     {
-        if (!$request->user()->isAdmin()) {
+        $adminId = $request->user()->isAdmin() ? $request->user()->id : ($request->user()->employee ? $request->user()->employee->admin_id : null);
+        if (!$adminId) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $setting = \App\Models\HrisAttendanceSetting::firstOrCreate(
-            ['tenant_id' => $request->user()->id],
-            ['edit_delete_limit_days' => 0, 'allow_admin_bypass' => true]
+        $setting = HrisAttendanceSetting::firstOrCreate(
+            ['tenant_id' => $adminId],
+            [
+                'is_shift_enabled' => false,
+                'check_in_start' => '06:00',
+                'work_start_time' => '08:00',
+                'late_tolerance_time' => '08:15',
+                'check_in_end' => '09:00',
+                'lock_after_late_cutoff' => true,
+                'late_cutoff_policy' => 'empty',
+                'work_end_time' => '17:00',
+                'min_checkout_at_work_end' => true,
+                'require_geofence_checkout' => true,
+                'edit_delete_limit_days' => 0,
+                'allow_admin_bypass' => true,
+            ]
         );
 
         return response()->json($setting);
@@ -451,7 +627,17 @@ class AttendanceController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'edit_delete_limit_days' => 'required|integer|min:0|max:3650',
+            'is_shift_enabled' => 'nullable|boolean',
+            'check_in_start' => 'nullable|string',
+            'work_start_time' => 'nullable|string',
+            'late_tolerance_time' => 'nullable|string',
+            'check_in_end' => 'nullable|string',
+            'lock_after_late_cutoff' => 'nullable|boolean',
+            'late_cutoff_policy' => 'nullable|string|in:empty,absent',
+            'work_end_time' => 'nullable|string',
+            'min_checkout_at_work_end' => 'nullable|boolean',
+            'require_geofence_checkout' => 'nullable|boolean',
+            'edit_delete_limit_days' => 'nullable|integer|min:0|max:3650',
             'allow_admin_bypass' => 'nullable|boolean',
         ]);
 
@@ -459,15 +645,28 @@ class AttendanceController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $setting = \App\Models\HrisAttendanceSetting::updateOrCreate(
+        $setting = HrisAttendanceSetting::updateOrCreate(
             ['tenant_id' => $request->user()->id],
             [
-                'edit_delete_limit_days' => $request->edit_delete_limit_days,
+                'is_shift_enabled' => $request->is_shift_enabled ?? false,
+                'check_in_start' => $request->check_in_start ? substr($request->check_in_start, 0, 5) : '06:00',
+                'work_start_time' => $request->work_start_time ? substr($request->work_start_time, 0, 5) : '08:00',
+                'late_tolerance_time' => $request->late_tolerance_time ? substr($request->late_tolerance_time, 0, 5) : '08:15',
+                'check_in_end' => $request->check_in_end ? substr($request->check_in_end, 0, 5) : '09:00',
+                'lock_after_late_cutoff' => $request->lock_after_late_cutoff ?? true,
+                'late_cutoff_policy' => $request->late_cutoff_policy ?? 'empty',
+                'work_end_time' => $request->work_end_time ? substr($request->work_end_time, 0, 5) : '17:00',
+                'min_checkout_at_work_end' => $request->min_checkout_at_work_end ?? true,
+                'require_geofence_checkout' => $request->require_geofence_checkout ?? true,
+                'edit_delete_limit_days' => $request->edit_delete_limit_days ?? 0,
                 'allow_admin_bypass' => $request->allow_admin_bypass ?? true,
             ]
         );
 
-        return response()->json($setting);
+        return response()->json([
+            'message' => 'Pengaturan kehadiran berhasil disimpan',
+            'setting' => $setting,
+        ]);
     }
 
     public function cleanupOldAttendances(Request $request)
@@ -477,12 +676,8 @@ class AttendanceController extends Controller
         ]);
 
         $beforeDate = $request->input('before_date');
-
-        // Convert string to Carbon date for proper comparison
         $beforeDateCarbon = Carbon::createFromFormat('Y-m-d', $beforeDate)->startOfDay();
 
-        // Delete attendances before the specified date, only for this admin's tenant
-        // Using whereHas to filter by employee's admin_id (tenant isolation)
         $deletedCount = Attendance::whereHas('employee', function ($query) use ($request) {
             $query->where('admin_id', $request->user()->id);
         })
@@ -490,31 +685,101 @@ class AttendanceController extends Controller
             ->delete();
 
         return response()->json([
-            'message' => 'Old attendances cleaned up successfully',
+            'message' => 'Data absensi lama berhasil dibersihkan',
             'deleted_count' => $deletedCount,
             'before_date' => $beforeDate
         ]);
     }
 
-
-
-    private function determineAttendanceStatus($isInOffice)
+    /**
+     * Helper to resolve the effective schedule for an employee for today
+     */
+    private function getEffectiveSchedule(Employee $employee, $dateStr = null)
     {
-        $now = Carbon::now();
-        $workStartTime = Carbon::today()->setTime(8, 0); // 08:00
-        $lateThreshold = Carbon::today()->setTime(8, 30); // 08:30
+        $date = $dateStr ?: Carbon::today()->format('Y-m-d');
+        $adminId = $employee->admin_id;
 
-        // If not in office geofence, mark as absent
-        if (!$isInOffice) {
-            return 'absent';
+        $setting = HrisAttendanceSetting::firstOrCreate(
+            ['tenant_id' => $adminId],
+            [
+                'is_shift_enabled' => false,
+                'check_in_start' => '06:00',
+                'work_start_time' => '08:00',
+                'late_tolerance_time' => '08:15',
+                'check_in_end' => '09:00',
+                'lock_after_late_cutoff' => true,
+                'late_cutoff_policy' => 'empty',
+                'work_end_time' => '17:00',
+                'min_checkout_at_work_end' => true,
+                'require_geofence_checkout' => true,
+            ]
+        );
+
+        // If Shift is enabled, check employee assignment
+        if ($setting->is_shift_enabled) {
+            $assignment = HrisShiftAssignment::where('employee_id', $employee->id)
+                ->where('date', $date)
+                ->with('shift')
+                ->first();
+
+            if ($assignment && $assignment->shift) {
+                $shift = $assignment->shift;
+                return [
+                    'is_shift' => true,
+                    'is_day_off' => false,
+                    'shift_id' => $shift->id,
+                    'shift_name' => $shift->name,
+                    'shift_code' => $shift->code,
+                    'color' => $shift->color ?: '#3b82f6',
+                    'check_in_start' => $shift->check_in_start,
+                    'work_start_time' => $shift->work_start_time,
+                    'late_tolerance_time' => $shift->late_tolerance_time,
+                    'check_in_end' => $shift->check_in_end,
+                    'work_end_time' => $shift->work_end_time,
+                    'is_night_shift' => $shift->is_night_shift,
+                    'lock_after_late_cutoff' => $setting->lock_after_late_cutoff,
+                    'min_checkout_at_work_end' => $setting->min_checkout_at_work_end,
+                    'require_geofence_checkout' => $setting->require_geofence_checkout,
+                ];
+            }
+
+            // When shift is enabled but NO shift is assigned for this date -> It is DAY OFF (Libur Kerja)
+            return [
+                'is_shift' => true,
+                'is_day_off' => true,
+                'shift_id' => null,
+                'shift_name' => 'Libur Kerja',
+                'shift_code' => 'OFF',
+                'color' => '#94a3b8',
+                'check_in_start' => null,
+                'work_start_time' => null,
+                'late_tolerance_time' => null,
+                'check_in_end' => null,
+                'work_end_time' => null,
+                'is_night_shift' => false,
+                'lock_after_late_cutoff' => false,
+                'min_checkout_at_work_end' => false,
+                'require_geofence_checkout' => $setting->require_geofence_checkout ?? true,
+            ];
         }
 
-        // If check-in after late threshold, mark as late
-        if ($now->gt($lateThreshold)) {
-            return 'late';
-        }
-
-        // Otherwise, mark as present
-        return 'present';
+        // Regular (Non-shift) Schedule
+        return [
+            'is_shift' => false,
+            'is_day_off' => false,
+            'shift_id' => null,
+            'shift_name' => 'Reguler (Non-Shift)',
+            'shift_code' => 'REG',
+            'color' => '#3b82f6',
+            'check_in_start' => $setting->check_in_start ?: '06:00',
+            'work_start_time' => $setting->work_start_time ?: '08:00',
+            'late_tolerance_time' => $setting->late_tolerance_time ?: '08:15',
+            'check_in_end' => $setting->check_in_end ?: '09:00',
+            'work_end_time' => $setting->work_end_time ?: '17:00',
+            'is_night_shift' => false,
+            'lock_after_late_cutoff' => $setting->lock_after_late_cutoff ?? true,
+            'min_checkout_at_work_end' => $setting->min_checkout_at_work_end ?? true,
+            'require_geofence_checkout' => $setting->require_geofence_checkout ?? true,
+        ];
     }
 }

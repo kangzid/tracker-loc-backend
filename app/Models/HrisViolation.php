@@ -23,7 +23,7 @@ class HrisViolation extends Model
         'description',
         'violation_points',
         'legal_basis',
-        'evidence_base64',
+        'evidence_path', 'evidence_name',
         'status',
         'issued_by',
         'notes',

@@ -21,7 +21,7 @@ class HrisComplianceItem extends Model
         'expiry_date',
         'status',
         'reminder_days_before',
-        'document_base64',
+        'document_path',
         'renewed_at',
         'notes',
     ];

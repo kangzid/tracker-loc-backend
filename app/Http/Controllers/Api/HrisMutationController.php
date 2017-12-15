@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\HrisMutation;
 use App\Models\Employee;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -183,4 +184,64 @@ class HrisMutationController extends Controller
 
         return response()->json(['status' => 'success', 'message' => 'Data mutasi berhasil dihapus.']);
     }
+
+    public function previewSk(Request $request, $id)
+    {
+        $tenantId = $this->getTenantId($request);
+        $mutation = HrisMutation::where('tenant_id', $tenantId)->findOrFail($id);
+
+        if (!$mutation->document_sk_path || !Storage::disk('local')->exists($mutation->document_sk_path)) {
+            if ($mutation->document_sk_base64) {
+                $raw = base64_decode(preg_replace('#^data:[^;]+;base64,#i', '', $mutation->document_sk_base64));
+                return response($raw, 200, [
+                    'Content-Type' => 'application/pdf',
+                    'Content-Disposition' => 'inline; filename="' . ($mutation->document_sk_name ?: 'SK_Mutasi.pdf') . '"'
+                ]);
+            }
+            return response()->json(['message' => 'Berkas SK mutasi tidak ditemukan.'], 404);
+        }
+
+        $encrypted = Storage::disk('local')->get($mutation->document_sk_path);
+        try {
+            $decrypted = Crypt::decrypt($encrypted);
+        } catch (\Exception $e) {
+            $decrypted = $encrypted;
+        }
+
+        return response($decrypted, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . ($mutation->document_sk_name ?: 'SK_Mutasi.pdf') . '"',
+            'Cache-Control' => 'private, no-cache, no-store, must-revalidate',
+        ]);
+    }
+
+    public function downloadSk(Request $request, $id)
+    {
+        $tenantId = $this->getTenantId($request);
+        $mutation = HrisMutation::where('tenant_id', $tenantId)->findOrFail($id);
+
+        if (!$mutation->document_sk_path || !Storage::disk('local')->exists($mutation->document_sk_path)) {
+            if ($mutation->document_sk_base64) {
+                $raw = base64_decode(preg_replace('#^data:[^;]+;base64,#i', '', $mutation->document_sk_base64));
+                return response($raw, 200, [
+                    'Content-Type' => 'application/pdf',
+                    'Content-Disposition' => 'attachment; filename="' . ($mutation->document_sk_name ?: 'SK_Mutasi.pdf') . '"'
+                ]);
+            }
+            return response()->json(['message' => 'Berkas SK mutasi tidak ditemukan.'], 404);
+        }
+
+        $encrypted = Storage::disk('local')->get($mutation->document_sk_path);
+        try {
+            $decrypted = Crypt::decrypt($encrypted);
+        } catch (\Exception $e) {
+            $decrypted = $encrypted;
+        }
+
+        return response($decrypted, 200, [
+            'Content-Type' => 'application/octet-stream',
+            'Content-Disposition' => 'attachment; filename="' . ($mutation->document_sk_name ?: 'SK_Mutasi.pdf') . '"',
+        ]);
+    }
+
 }

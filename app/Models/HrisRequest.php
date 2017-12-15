@@ -21,7 +21,7 @@ class HrisRequest extends Model
         'end_date',
         'days_count',
         'reason',
-        'attachment_base64',
+        'attachment_path',
         'attachment_name',
         'from_shift',
         'to_shift',
