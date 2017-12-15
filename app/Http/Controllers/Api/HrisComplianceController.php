@@ -23,7 +23,6 @@ class HrisComplianceController extends Controller
     public function summary(Request $request)
     {
         $tenantId = $this->getTenantId($request);
-        $today = Carbon::today();
 
         $items = HrisComplianceItem::where('tenant_id', $tenantId)->get();
 
@@ -212,7 +211,11 @@ class HrisComplianceController extends Controller
         $targetId = $request->target_id ?? $item->target_id;
         $targetPrefix = $targetType . '_' . $targetId;
 
+        // If new file provided, remove old encrypted file and save new one
         if ($request->hasFile('document_file')) {
+            if (!empty($item->document_path)) {
+                EncryptedStorageService::deleteFile($item->document_path);
+            }
             $stored = EncryptedStorageService::storeEncrypted(
                 $request->file('document_file'),
                 $tenantId,
@@ -221,6 +224,9 @@ class HrisComplianceController extends Controller
             );
             $item->document_path = $stored['path'];
         } elseif ($request->filled('document_base64')) {
+            if (!empty($item->document_path)) {
+                EncryptedStorageService::deleteFile($item->document_path);
+            }
             $stored = EncryptedStorageService::storeEncrypted(
                 $request->document_base64,
                 $tenantId,
@@ -258,12 +264,19 @@ class HrisComplianceController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            return response()->json([
+                'message' => 'Validasi gagal',
+                'errors' => $validator->errors()
+            ], 422);
         }
 
         $targetPrefix = $item->target_type . '_' . $item->target_id;
 
+        // If new file provided upon renewal, delete old encrypted file and save new
         if ($request->hasFile('document_file')) {
+            if (!empty($item->document_path)) {
+                EncryptedStorageService::deleteFile($item->document_path);
+            }
             $stored = EncryptedStorageService::storeEncrypted(
                 $request->file('document_file'),
                 $tenantId,
@@ -272,6 +285,9 @@ class HrisComplianceController extends Controller
             );
             $item->document_path = $stored['path'];
         } elseif ($request->filled('document_base64')) {
+            if (!empty($item->document_path)) {
+                EncryptedStorageService::deleteFile($item->document_path);
+            }
             $stored = EncryptedStorageService::storeEncrypted(
                 $request->document_base64,
                 $tenantId,
@@ -288,7 +304,8 @@ class HrisComplianceController extends Controller
         }
         $item->renewed_at = Carbon::today();
         if ($request->filled('notes')) {
-            $item->notes = ($item->notes ? $item->notes . "\n" : "") . $request->notes;
+            $item->notes = ($item->notes ? $item->notes . "
+" : "") . $request->notes;
         }
         $item->status = $item->calculateCurrentStatus();
         $item->save();

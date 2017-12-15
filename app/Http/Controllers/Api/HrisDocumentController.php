@@ -102,13 +102,24 @@ class HrisDocumentController extends Controller
         $fileSizeKb = 0;
 
         if ($request->hasFile('document_file')) {
-            $stored = EncryptedStorageService::storeEncrypted($request->file('document_file'), $tenantId, 'documents', 'doc_' . $request->employee_id);
+            $stored = EncryptedStorageService::storeEncrypted(
+                $request->file('document_file'),
+                $tenantId,
+                'documents',
+                'doc_' . $request->employee_id
+            );
             $filePath = $stored['path'];
             $fileName = $stored['name'];
             $fileType = $stored['mime'];
             $fileSizeKb = (int) ($stored['size'] / 1024);
         } elseif ($request->filled('file_base64')) {
-            $stored = EncryptedStorageService::storeEncrypted($request->file_base64, $tenantId, 'documents', 'doc_' . $request->employee_id, $fileName);
+            $stored = EncryptedStorageService::storeEncrypted(
+                $request->file_base64,
+                $tenantId,
+                'documents',
+                'doc_' . $request->employee_id,
+                $fileName
+            );
             $filePath = $stored['path'];
             $fileName = $stored['name'];
             $fileType = $stored['mime'];
@@ -142,6 +153,89 @@ class HrisDocumentController extends Controller
             ->findOrFail($id);
 
         return response()->json($doc);
+    }
+
+    public function update(Request $request, $id)
+    {
+        $tenantId = $this->getTenantId($request);
+        $doc = HrisDocument::where('tenant_id', $tenantId)->findOrFail($id);
+
+        $validator = Validator::make($request->all(), [
+            'employee_id' => 'sometimes|required|exists:employees,id',
+            'title' => 'sometimes|required|string|max:150',
+            'category' => 'sometimes|required|string|max:50',
+            'file_base64' => 'nullable|string',
+            'document_file' => 'nullable|file|max:10240',
+            'file_name' => 'nullable|string|max:255',
+            'file_type' => 'nullable|string|max:50',
+            'physical_location' => 'nullable|string|max:255',
+            'is_original_stored' => 'nullable|boolean',
+            'notes' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        if ($request->has('employee_id')) {
+            $doc->employee_id = $request->employee_id;
+        }
+        if ($request->has('title')) {
+            $doc->title = $request->title;
+        }
+        if ($request->has('category')) {
+            $doc->category = $request->category;
+        }
+        if ($request->has('physical_location')) {
+            $doc->physical_location = $request->physical_location;
+        }
+        if ($request->has('is_original_stored')) {
+            $doc->is_original_stored = filter_var($request->is_original_stored, FILTER_VALIDATE_BOOLEAN);
+        }
+        if ($request->has('notes')) {
+            $doc->notes = $request->notes;
+        }
+
+        // Handle file replacement if new file is uploaded
+        if ($request->hasFile('document_file')) {
+            // Delete old file from storage if exists
+            if (!empty($doc->document_path)) {
+                EncryptedStorageService::deleteFile($doc->document_path);
+            }
+            $stored = EncryptedStorageService::storeEncrypted(
+                $request->file('document_file'),
+                $tenantId,
+                'documents',
+                'doc_' . $doc->employee_id
+            );
+            $doc->document_path = $stored['path'];
+            $doc->document_name = $stored['name'];
+            $doc->file_name = $stored['name'];
+            $doc->file_type = $stored['mime'];
+            $doc->file_size_kb = (int) ($stored['size'] / 1024);
+        } elseif ($request->filled('file_base64')) {
+            // Delete old file from storage if exists
+            if (!empty($doc->document_path)) {
+                EncryptedStorageService::deleteFile($doc->document_path);
+            }
+            $fileName = $request->file_name ?? ($doc->document_name ?: ($doc->title . '.pdf'));
+            $stored = EncryptedStorageService::storeEncrypted(
+                $request->file_base64,
+                $tenantId,
+                'documents',
+                'doc_' . $doc->employee_id,
+                $fileName
+            );
+            $doc->document_path = $stored['path'];
+            $doc->document_name = $stored['name'];
+            $doc->file_name = $stored['name'];
+            $doc->file_type = $stored['mime'];
+            $doc->file_size_kb = (int) ($stored['size'] / 1024);
+        }
+
+        $doc->save();
+
+        return response()->json($doc->load(['employee.user', 'verifier']));
     }
 
     public function preview(Request $request, $id)
@@ -189,6 +283,12 @@ class HrisDocumentController extends Controller
     {
         $tenantId = $this->getTenantId($request);
         $doc = HrisDocument::where('tenant_id', $tenantId)->findOrFail($id);
+
+        // Delete encrypted file from disk when deleted
+        if (!empty($doc->document_path)) {
+            EncryptedStorageService::deleteFile($doc->document_path);
+        }
+
         $doc->delete();
         return response()->json(['message' => 'Dokumen berhasil dihapus.']);
     }

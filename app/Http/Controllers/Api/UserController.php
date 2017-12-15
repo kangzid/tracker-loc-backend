@@ -11,6 +11,36 @@ use Illuminate\Support\Facades\Validator;
 
 class UserController extends Controller
 {
+    public function store(Request $request)
+    {
+        if (!$request->user()->isAdmin() && !$request->user()->isSuperAdmin()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email',
+            'password' => 'required|string|min:6',
+            'role' => 'required|string|in:admin,employee,driver,technician',
+            'is_active' => 'nullable|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $user = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => \Illuminate\Support\Facades\Hash::make($request->password),
+            'role' => $request->role,
+            'admin_id' => $request->user()->isAdmin() ? $request->user()->id : ($request->admin_id ?? null),
+            'is_active' => $request->boolean('is_active', true),
+        ]);
+
+        return response()->json($user, 201);
+    }
+
     public function index(Request $request)
     {
         if (!$request->user()->isAdmin()) {

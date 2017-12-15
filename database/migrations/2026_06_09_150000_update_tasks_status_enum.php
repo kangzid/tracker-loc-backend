@@ -12,8 +12,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Alter status column to add 'accepted' to the enum
-        DB::statement("ALTER TABLE tasks MODIFY COLUMN status ENUM('pending', 'accepted', 'in_progress', 'completed', 'cancelled') DEFAULT 'pending'");
+        // Only run raw ALTER TABLE on MySQL / MariaDB connection, skip on SQLite testing
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE tasks MODIFY COLUMN status ENUM('pending', 'accepted', 'in_progress', 'completed', 'cancelled') DEFAULT 'pending'");
+        }
     }
 
     /**
@@ -21,9 +23,9 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // Reset tasks in 'accepted' status to 'pending' before dropping the 'accepted' enum value
-        DB::table('tasks')->where('status', 'accepted')->update(['status' => 'pending']);
-        
-        DB::statement("ALTER TABLE tasks MODIFY COLUMN status ENUM('pending', 'in_progress', 'completed', 'cancelled') DEFAULT 'pending'");
+        if (DB::getDriverName() === 'mysql') {
+            DB::table('tasks')->where('status', 'accepted')->update(['status' => 'pending']);
+            DB::statement("ALTER TABLE tasks MODIFY COLUMN status ENUM('pending', 'in_progress', 'completed', 'cancelled') DEFAULT 'pending'");
+        }
     }
 };

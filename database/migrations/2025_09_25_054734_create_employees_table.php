@@ -23,6 +23,8 @@ return new class extends Migration
             $table->decimal('latitude', 10, 8)->nullable();
             $table->decimal('longitude', 11, 8)->nullable();
             $table->timestamp('last_location_update')->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->date('exit_date')->nullable();
             $table->timestamps();
 
             // PERFORMANCE INDEXES

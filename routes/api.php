@@ -192,6 +192,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/hris/payroll/settings', [\App\Http\Controllers\Api\HrisPayrollSettingController::class, 'saveSettings']);
         Route::get('/payrolls', [App\Http\Controllers\Api\HrisPayrollController::class, 'index']);
         Route::post('/payrolls/generate-monthly', [App\Http\Controllers\Api\HrisPayrollController::class, 'generateMonthly']);
+        Route::post('/hris/payrolls/generate-monthly', [App\Http\Controllers\Api\HrisPayrollController::class, 'generateMonthly']);
         Route::post('/payrolls/generate-daily', [App\Http\Controllers\Api\HrisPayrollController::class, 'generateDaily']);
         Route::get('/payrolls/{id}/slips', [App\Http\Controllers\Api\HrisPayrollController::class, 'slips']);
         Route::post('/payrolls/{id}/publish', [App\Http\Controllers\Api\HrisPayrollController::class, 'publish']);
@@ -319,10 +320,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
           // 16. Pelanggaran & Surat Peringatan (Violations & Warning Letters)
           Route::get('/violations/summary', [\App\Http\Controllers\Api\HrisViolationController::class, 'summary']);
-          Route::get('/violations/types', [\App\Http\Controllers\Api\HrisViolationController::class, 'types']);
-          Route::post('/violations/types', [\App\Http\Controllers\Api\HrisViolationController::class, 'storeType']);
-          Route::put('/violations/types/{id}', [\App\Http\Controllers\Api\HrisViolationController::class, 'updateType']);
-          Route::delete('/violations/types/{id}', [\App\Http\Controllers\Api\HrisViolationController::class, 'destroyType']);
+          Route::get('/violations/types', [\App\Http\Controllers\Api\HrisViolationController::class, 'getViolationTypes']);
+          Route::post('/violations/types', [\App\Http\Controllers\Api\HrisViolationController::class, 'storeViolationType']);
+          Route::put('/violations/types/{id}', [\App\Http\Controllers\Api\HrisViolationController::class, 'storeViolationType']);
+          Route::delete('/violations/types/{id}', [\App\Http\Controllers\Api\HrisViolationController::class, 'deleteViolationType']);
           Route::get('/violations', [\App\Http\Controllers\Api\HrisViolationController::class, 'index']);
           Route::post('/violations', [\App\Http\Controllers\Api\HrisViolationController::class, 'store']);
           Route::put('/violations/{id}', [\App\Http\Controllers\Api\HrisViolationController::class, 'update']);
@@ -446,6 +447,8 @@ Route::middleware('auth:sanctum')->group(function () {
           Route::put('/compliance/{id}', [\App\Http\Controllers\Api\HrisComplianceController::class, 'update']);
           Route::post('/compliance/{id}/renew', [\App\Http\Controllers\Api\HrisComplianceController::class, 'renew']);
           Route::delete('/compliance/{id}', [\App\Http\Controllers\Api\HrisComplianceController::class, 'destroy']);
+          Route::get('/compliance/{id}/preview', [\App\Http\Controllers\Api\HrisComplianceController::class, 'previewDoc']);
+          Route::get('/compliance/{id}/download', [\App\Http\Controllers\Api\HrisComplianceController::class, 'downloadDoc']);
 
           // 18. Training & Skills (Pelatihan & Sertifikasi)
           Route::get('/training/summary', [\App\Http\Controllers\Api\HrisTrainingController::class, 'summary']);

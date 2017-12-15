@@ -347,7 +347,7 @@ class HrisClaimController extends Controller
             'description' => 'nullable|string|max:255',
             'max_amount_per_claim' => 'nullable|numeric|min:0',
             'max_amount_per_month' => 'nullable|numeric|min:0',
-            'requires_receipt' => 'boolean',
+            'require_proof' => 'boolean',
             'is_active' => 'boolean',
         ]);
 
@@ -363,7 +363,7 @@ class HrisClaimController extends Controller
                 'description' => $request->description,
                 'max_amount_per_claim' => $request->max_amount_per_claim ?? 0,
                 'max_amount_per_month' => $request->max_amount_per_month ?? 0,
-                'requires_receipt' => $request->requires_receipt ?? true,
+                'require_proof' => $request->requires_receipt ?? true,
                 'is_active' => $request->is_active ?? true,
             ]
         );

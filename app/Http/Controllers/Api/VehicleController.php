@@ -13,7 +13,7 @@ class VehicleController extends Controller
 {
     public function index(Request $request)
     {
-        if (!$request->user()->isAdmin()) {
+        if (!$request->user()->isAdmin() && !$request->user()->isSuperAdmin()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -28,7 +28,7 @@ class VehicleController extends Controller
 
     public function store(Request $request)
     {
-        if (!$request->user()->isAdmin()) {
+        if (!$request->user()->isAdmin() && !$request->user()->isSuperAdmin()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -66,7 +66,7 @@ class VehicleController extends Controller
 
     public function show(Request $request, $id)
     {
-        if (!$request->user()->isAdmin()) {
+        if (!$request->user()->isAdmin() && !$request->user()->isSuperAdmin()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -79,7 +79,7 @@ class VehicleController extends Controller
 
     public function update(Request $request, $id)
     {
-        if (!$request->user()->isAdmin()) {
+        if (!$request->user()->isAdmin() && !$request->user()->isSuperAdmin()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -113,7 +113,7 @@ class VehicleController extends Controller
 
     public function destroy(Request $request, $id)
     {
-        if (!$request->user()->isAdmin()) {
+        if (!$request->user()->isAdmin() && !$request->user()->isSuperAdmin()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -133,7 +133,7 @@ class VehicleController extends Controller
 
     public function activeVehicles(Request $request)
     {
-        if (!$request->user()->isAdmin()) {
+        if (!$request->user()->isAdmin() && !$request->user()->isSuperAdmin()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -148,7 +148,7 @@ class VehicleController extends Controller
 
     public function inactiveVehicles(Request $request)
     {
-        if (!$request->user()->isAdmin()) {
+        if (!$request->user()->isAdmin() && !$request->user()->isSuperAdmin()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -163,7 +163,7 @@ class VehicleController extends Controller
 
     public function updateLocation(Request $request, $id)
     {
-        if (!$request->user()->isAdmin()) {
+        if (!$request->user()->isAdmin() && !$request->user()->isSuperAdmin()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -219,7 +219,7 @@ class VehicleController extends Controller
 
     public function regenerateToken(Request $request, $id)
     {
-        if (!$request->user()->isAdmin()) {
+        if (!$request->user()->isAdmin() && !$request->user()->isSuperAdmin()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -239,7 +239,7 @@ class VehicleController extends Controller
 
     public function getToken(Request $request, $id)
     {
-        if (!$request->user()->isAdmin()) {
+        if (!$request->user()->isAdmin() && !$request->user()->isSuperAdmin()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 

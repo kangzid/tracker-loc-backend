@@ -48,8 +48,26 @@ return new class extends Migration
             });
         }
 
-        // 3. Update hris_attendance_settings table with complete rule columns
-        if (Schema::hasTable('hris_attendance_settings')) {
+        // 3. Ensure hris_attendance_settings table exists with complete rule columns
+        if (!Schema::hasTable('hris_attendance_settings')) {
+            Schema::create('hris_attendance_settings', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('tenant_id')->constrained('users')->onDelete('cascade');
+                $table->boolean('is_shift_enabled')->default(false);
+                $table->string('check_in_start', 10)->default('06:00');
+                $table->string('work_start_time', 10)->default('08:00');
+                $table->string('late_tolerance_time', 10)->default('08:15');
+                $table->string('check_in_end', 10)->default('09:00');
+                $table->boolean('lock_after_late_cutoff')->default(true);
+                $table->string('late_cutoff_policy', 20)->default('empty');
+                $table->string('work_end_time', 10)->default('17:00');
+                $table->boolean('min_checkout_at_work_end')->default(true);
+                $table->boolean('require_geofence_checkout')->default(true);
+                $table->timestamps();
+
+                $table->index('tenant_id');
+            });
+        } else {
             Schema::table('hris_attendance_settings', function (Blueprint $table) {
                 if (!Schema::hasColumn('hris_attendance_settings', 'is_shift_enabled')) {
                     $table->boolean('is_shift_enabled')->default(false)->after('tenant_id');
@@ -107,5 +125,6 @@ return new class extends Migration
 
         Schema::dropIfExists('hris_shift_assignments');
         Schema::dropIfExists('hris_shifts');
+        Schema::dropIfExists('hris_attendance_settings');
     }
 };

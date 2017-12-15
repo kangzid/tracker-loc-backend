@@ -124,19 +124,18 @@ return new class extends Migration
             Schema::create('hris_payrolls', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('tenant_id')->constrained('users')->onDelete('cascade');
-                $table->string('batch_code', 50)->unique();
-                $table->string('batch_name', 150);
-                $table->enum('type', ['monthly', 'daily'])->default('monthly');
+                $table->string('payroll_type', 50)->default('monthly');
+                $table->string('code', 50)->nullable();
+                $table->string('batch_name', 150)->nullable();
                 $table->integer('month')->nullable();
-                $table->integer('year');
-                $table->date('period_start');
-                $table->date('period_end');
-                $table->date('pay_date')->nullable();
-                $table->integer('total_recipients')->default(0);
+                $table->integer('year')->nullable();
+                $table->date('slip_date')->nullable();
+                $table->date('period_start')->nullable();
+                $table->date('period_end')->nullable();
                 $table->decimal('total_amount', 15, 2)->default(0);
-                $table->enum('status', ['draft', 'published'])->default('draft');
-                $table->text('notes')->nullable();
-                $table->foreignId('created_by')->constrained('users');
+                $table->string('status', 30)->default('draft');
+                $table->string('report_file_path', 255)->nullable();
+                $table->foreignId('processed_by')->nullable()->constrained('users')->nullOnDelete();
                 $table->timestamps();
             });
         }
@@ -278,7 +277,7 @@ return new class extends Migration
                 $table->string('category', 50);
                 $table->string('serial_number', 100)->nullable();
                 $table->foreignId('employee_id')->nullable()->constrained('employees')->onDelete('set null');
-                $table->enum('status', ['available', 'assigned', 'maintenance', 'damaged', 'lost'])->default('available');
+                $table->enum('status', ['available', 'storage', 'assigned', 'maintenance', 'damaged', 'disposed', 'lost'])->default('available');
                 $table->date('handover_date')->nullable();
                 $table->date('returned_date')->nullable();
                 $table->string('condition', 50)->default('Baik');
@@ -368,7 +367,9 @@ return new class extends Migration
                 $table->foreignId('employee_id')->constrained('employees')->onDelete('cascade');
                 $table->string('title', 150);
                 $table->string('category', 50);
-                $table->longText('file_base64');
+                $table->longText('file_base64')->nullable();
+                $table->string('document_name', 255)->nullable();
+                $table->string('document_path', 255)->nullable();
                 $table->string('file_name', 255)->nullable();
                 $table->string('file_type', 50)->default('image/jpeg');
                 $table->integer('file_size_kb')->default(0);

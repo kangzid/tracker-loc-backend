@@ -2,22 +2,16 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class HrisDocument extends Model
 {
-    use HasFactory;
-
-    protected $table = 'hris_documents';
-
-        protected $fillable = [
+    protected $fillable = [
         'tenant_id',
         'employee_id',
         'title',
         'category',
         'document_name',
-        'document_path',
         'document_path',
         'file_name',
         'file_type',
@@ -38,16 +32,11 @@ class HrisDocument extends Model
 
     public function employee()
     {
-        return $this->belongsTo(Employee::class, 'employee_id');
+        return $this->belongsTo(Employee::class);
     }
 
     public function verifier()
     {
         return $this->belongsTo(User::class, 'verified_by');
-    }
-
-    public function tenant()
-    {
-        return $this->belongsTo(User::class, 'tenant_id');
     }
 }
