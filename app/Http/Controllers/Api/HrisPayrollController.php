@@ -19,6 +19,8 @@ use App\Models\HrisRequest;
 use App\Models\HrisRequestPolicy;
 use App\Models\HrisContract;
 use App\Models\HrisResignation;
+use App\Models\HrisPayrollSetting;
+use App\Models\HrisAttendanceSetting;
 use App\Services\EncryptedStorageService;
 use Illuminate\Support\Facades\DB;
 
@@ -247,7 +249,28 @@ class HrisPayrollController extends Controller
                     }
                 }
 
-                $dailyRate = $basicSalary > 0 ? ($basicSalary / 25) : 0;
+                // Resolve Working Days Divider from Payroll Settings
+                $payrollSetting = HrisPayrollSetting::firstOrCreate(
+                    ['tenant_id' => $tenantId],
+                    ['working_days_divider_type' => 'fixed_25', 'custom_working_days' => 25]
+                );
+
+                $dividerDays = 25;
+                if ($payrollSetting->working_days_divider_type === 'fixed_22') {
+                    $dividerDays = 22;
+                } elseif ($payrollSetting->working_days_divider_type === 'fixed_21') {
+                    $dividerDays = 21;
+                } elseif ($payrollSetting->working_days_divider_type === 'fixed_20') {
+                    $dividerDays = 20;
+                } elseif ($payrollSetting->working_days_divider_type === 'calendar_days') {
+                    $pStart = Carbon::parse($request->period_start);
+                    $pEnd = Carbon::parse($request->period_end);
+                    $dividerDays = max(1, $pStart->diffInDays($pEnd) + 1);
+                } elseif ($payrollSetting->working_days_divider_type === 'custom') {
+                    $dividerDays = max(1, (int)$payrollSetting->custom_working_days);
+                }
+
+                $dailyRate = $basicSalary > 0 ? ($basicSalary / $dividerDays) : 0;
                 $absenceDeductions = round($unpaidDays * $dailyRate, 2);
 
                 // 7. Adjustments

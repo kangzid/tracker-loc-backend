@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\HrisRequest;
+use App\Models\HrisLeaveType;
+use App\Models\HrisRequestPolicy;
 use App\Models\HrisEmployeeLeaveBalance;
 use App\Models\Attendance;
 use App\Services\EncryptedStorageService;
@@ -100,8 +102,9 @@ class HrisRequestController extends Controller
             ->with(['employee.user', 'leaveType', 'approver'])
             ->orderBy('id', 'desc');
 
-        if ($request->has('request_type') && $request->request_type !== 'all') {
-            $normalized = $this->normalizeRequestType($request->request_type);
+        $typeParam = $request->query('type') ?? $request->query('request_type');
+        if ($typeParam && $typeParam !== 'all') {
+            $normalized = $this->normalizeRequestType($typeParam);
             $query->where('request_type', $normalized);
         }
 

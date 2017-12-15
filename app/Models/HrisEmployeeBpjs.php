@@ -4,7 +4,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class HrisEmployeeBpjs extends Model
 {
-    protected $fillable = ['tenant_id', 'employee_id', 'code', 'bpjs_type', 'amount', 'effective_date'];
+    protected $fillable = ['tenant_id', 'employee_id', 'code', 'bpjs_type', 'bpjs_number', 'amount', 'effective_date'];
 
     protected $casts = [
         'amount' => 'decimal:2',

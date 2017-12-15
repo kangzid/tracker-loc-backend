@@ -628,6 +628,7 @@ class AttendanceController extends Controller
 
         $validator = Validator::make($request->all(), [
             'is_shift_enabled' => 'nullable|boolean',
+            'standard_working_days' => 'nullable|array',
             'check_in_start' => 'nullable|string',
             'work_start_time' => 'nullable|string',
             'late_tolerance_time' => 'nullable|string',
@@ -649,6 +650,7 @@ class AttendanceController extends Controller
             ['tenant_id' => $request->user()->id],
             [
                 'is_shift_enabled' => $request->is_shift_enabled ?? false,
+                'standard_working_days' => $request->standard_working_days ?? [1, 2, 3, 4, 5, 6],
                 'check_in_start' => $request->check_in_start ? substr($request->check_in_start, 0, 5) : '06:00',
                 'work_start_time' => $request->work_start_time ? substr($request->work_start_time, 0, 5) : '08:00',
                 'late_tolerance_time' => $request->late_tolerance_time ? substr($request->late_tolerance_time, 0, 5) : '08:15',
@@ -763,14 +765,44 @@ class AttendanceController extends Controller
             ];
         }
 
-        // Regular (Non-shift) Schedule
+        // Regular (Non-shift) Schedule - Evaluate Standard Working Days
+        $dayOfWeek = (int)Carbon::parse($date)->format('w'); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+        $standardDays = $setting->standard_working_days;
+        if (!is_array($standardDays) || empty($standardDays)) {
+            $standardDays = [1, 2, 3, 4, 5, 6]; // Default: Senin - Sabtu (1-6)
+        } else {
+            $standardDays = array_map('intval', $standardDays);
+        }
+
+        $isDayOff = !in_array($dayOfWeek, $standardDays, true);
+
+        if ($isDayOff) {
+            return [
+                'is_shift' => false,
+                'is_day_off' => true,
+                'shift_id' => null,
+                'shift_name' => 'Libur Kerja (Day-Off)',
+                'shift_code' => 'OFF',
+                'color' => '#94a3b8',
+                'check_in_start' => null,
+                'work_start_time' => null,
+                'late_tolerance_time' => null,
+                'check_in_end' => null,
+                'work_end_time' => null,
+                'is_night_shift' => false,
+                'lock_after_late_cutoff' => false,
+                'min_checkout_at_work_end' => false,
+                'require_geofence_checkout' => $setting->require_geofence_checkout ?? true,
+            ];
+        }
+
         return [
             'is_shift' => false,
             'is_day_off' => false,
             'shift_id' => null,
-            'shift_name' => 'Reguler (Non-Shift)',
+            'shift_name' => 'Jadwal Reguler',
             'shift_code' => 'REG',
-            'color' => '#3b82f6',
+            'color' => '#10b981',
             'check_in_start' => $setting->check_in_start ?: '06:00',
             'work_start_time' => $setting->work_start_time ?: '08:00',
             'late_tolerance_time' => $setting->late_tolerance_time ?: '08:15',

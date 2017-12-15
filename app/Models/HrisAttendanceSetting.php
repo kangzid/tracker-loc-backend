@@ -14,6 +14,7 @@ class HrisAttendanceSetting extends Model
     protected $fillable = [
         'tenant_id',
         'is_shift_enabled',
+        'standard_working_days',
         'check_in_start',
         'work_start_time',
         'late_tolerance_time',
@@ -29,6 +30,7 @@ class HrisAttendanceSetting extends Model
 
     protected $casts = [
         'is_shift_enabled' => 'boolean',
+        'standard_working_days' => 'array',
         'lock_after_late_cutoff' => 'boolean',
         'min_checkout_at_work_end' => 'boolean',
         'require_geofence_checkout' => 'boolean',

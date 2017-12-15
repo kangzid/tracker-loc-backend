@@ -163,6 +163,7 @@ class HrisPayrollMasterController extends Controller
         $request->validate([
             'employee_id' => 'required|exists:employees,id',
             'bpjs_type' => 'required|in:kesehatan,ketenagakerjaan',
+            'bpjs_number' => 'nullable|string|max:50',
             'amount' => 'required|numeric|min:0',
             'effective_date' => 'required|date',
         ]);
@@ -181,6 +182,7 @@ class HrisPayrollMasterController extends Controller
             'employee_id' => $request->employee_id,
             'code' => $code,
             'bpjs_type' => $request->bpjs_type,
+            'bpjs_number' => $request->bpjs_number,
             'amount' => $request->amount,
             'effective_date' => $request->effective_date,
         ]);

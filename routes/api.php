@@ -186,6 +186,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/shift-assignments/{id}', [\App\Http\Controllers\Api\HrisShiftController::class, 'deleteAssignment']);
 
         // 1. Slip Gaji (Bulanan & Harian)
+        Route::get('/payroll/settings', [\App\Http\Controllers\Api\HrisPayrollSettingController::class, 'getSettings']);
+        Route::post('/payroll/settings', [\App\Http\Controllers\Api\HrisPayrollSettingController::class, 'saveSettings']);
+        Route::get('/hris/payroll/settings', [\App\Http\Controllers\Api\HrisPayrollSettingController::class, 'getSettings']);
+        Route::post('/hris/payroll/settings', [\App\Http\Controllers\Api\HrisPayrollSettingController::class, 'saveSettings']);
         Route::get('/payrolls', [App\Http\Controllers\Api\HrisPayrollController::class, 'index']);
         Route::post('/payrolls/generate-monthly', [App\Http\Controllers\Api\HrisPayrollController::class, 'generateMonthly']);
         Route::post('/payrolls/generate-daily', [App\Http\Controllers\Api\HrisPayrollController::class, 'generateDaily']);

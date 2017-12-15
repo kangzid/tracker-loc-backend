@@ -303,7 +303,16 @@ class EmployeeController extends Controller
             $totalAllowancesAmount = (float) ($allowances->total_amount ?? 0);
         }
 
-        $bpjs = \App\Models\HrisEmployeeBpjs::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->first();
+        $bpjsKes = \App\Models\HrisEmployeeBpjs::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->where('bpjs_type', 'kesehatan')->latest('effective_date')->first();
+        $bpjsTk = \App\Models\HrisEmployeeBpjs::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->where('bpjs_type', 'ketenagakerjaan')->latest('effective_date')->first();
+        $bpjs = [
+            'bpjs_kesehatan_number' => $bpjsKes ? $bpjsKes->bpjs_number : null,
+            'bpjs_tk_number' => $bpjsTk ? $bpjsTk->bpjs_number : null,
+            'has_bpjs_kesehatan' => !empty($bpjsKes),
+            'has_bpjs_ketenagakerjaan' => !empty($bpjsTk),
+            'kesehatan' => $bpjsKes,
+            'ketenagakerjaan' => $bpjsTk,
+        ];
         $mutations = \App\Models\HrisMutation::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->orderBy('effective_date', 'desc')->get();
         $resignation = \App\Models\HrisResignation::where('tenant_id', $tenantId)->where('employee_id', $employee->id)->latest()->first();
 
