@@ -1445,6 +1445,43 @@
               "response": []
             },
             {
+              "name": "Admin: Create Attendance",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"employee_id\": 2,\n  \"date\": \"2026-04-06\",\n  \"status\": \"absent\",\n  \"check_in\": \"08:00\",\n  \"check_out\": \"17:00\",\n  \"notes\": \"Gap fill - employee forgot to check in\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/admin/attendances",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "attendances"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
               "name": "Admin: Delete Attendance",
               "request": {
                 "auth": {

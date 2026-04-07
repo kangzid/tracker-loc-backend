@@ -305,7 +305,7 @@ class AttendanceController extends Controller
         $validator = Validator::make($request->all(), [
             'employee_id' => 'required|integer|exists:employees,id',
             'date' => 'required|date_format:Y-m-d',
-            'status' => 'required|in:present,late,absent,sick,leave',
+            'status' => 'required|in:present,absent,late,early_leave',
             'check_in' => 'nullable|date_format:H:i',
             'check_out' => 'nullable|date_format:H:i',
             'notes' => 'nullable|string|max:255',
