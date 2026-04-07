@@ -81,6 +81,122 @@ POST /attendances
 GET /attendances/today
 ```
 
+#### Admin - Create Attendance (Manual/Gap-Fill)
+**Purpose:** Allow admin to manually create attendance records when:
+- Employee forgot to check-in
+- Need to fill attendance gaps
+- Manual corrections before system check-in
+
+```http
+POST /admin/attendances
+```
+
+**Body:**
+```json
+{
+    "employee_id": 2,
+    "date": "2026-04-06",
+    "status": "absent",
+    "check_in": "08:00",
+    "check_out": "17:00",
+    "notes": "Sakit (surat keterangan)"
+}
+```
+
+**Required Fields:**
+- `employee_id` (integer): Must belong to admin's tenant
+- `date` (string, format: Y-m-d): Date of attendance
+- `status` (string): One of `present`, `late`, `absent`, `sick`, `leave`
+
+**Optional Fields:**
+- `check_in` (string, format: H:i): Check-in time
+- `check_out` (string, format: H:i): Check-out time  
+- `notes` (string, max 255 chars): Documentation/reason
+
+**Responses:**
+
+Success (201 Created):
+```json
+{
+    "message": "Attendance record created successfully",
+    "data": {
+        "id": 5,
+        "employee_id": 2,
+        "date": "2026-04-06",
+        "status": "absent",
+        "check_in": "2026-04-06T08:00:00",
+        "check_out": "2026-04-06T17:00:00",
+        "notes": "Sakit (surat keterangan)",
+        "created_at": "2026-04-08T...",
+        "updated_at": "2026-04-08T...",
+        "employee": {
+            "id": 2,
+            "name": "Jane Doe",
+            "user": { ... }
+        }
+    }
+}
+```
+
+Duplicate Record (409 Conflict):
+```json
+{
+    "message": "Attendance record already exists for this date",
+    "date": "2026-04-06",
+    "existing_id": 3,
+    "note": "Use update endpoint to modify existing record"
+}
+```
+
+Employee Not Found (404 Not Found):
+```json
+{
+    "message": "Employee not found or does not belong to your tenant"
+}
+```
+
+Validation Error (422 Unprocessable Entity):
+```json
+{
+    "errors": {
+        "status": ["The status field is required."],
+        "date": ["The date field must be a date in Y-m-d format."]
+    }
+}
+```
+
+#### Admin - Get Employee Attendances
+```http
+GET /admin/attendances/employee/{employeeId}
+```
+
+**Query Parameters:**
+- `date` (optional): Filter by specific date (format: Y-m-d)
+- `year` (optional): Filter by year
+- `month` (optional): Filter by month
+
+#### Admin - Update Attendance
+```http
+PUT /admin/attendances/{attendanceId}
+```
+
+**Body:**
+```json
+{
+    "status": "present",
+    "check_in": "08:30",
+    "check_out": "17:30",
+    "notes": "Updated status"
+}
+```
+
+#### Admin - Delete Attendance  
+```http
+DELETE /admin/attendances/{attendanceId}
+```
+
+**Note:** Can only delete attendance within 7 days
+
 ### Location Tracking
 
 #### Store Location
