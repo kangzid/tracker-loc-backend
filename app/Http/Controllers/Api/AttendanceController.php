@@ -109,7 +109,22 @@ class AttendanceController extends Controller
 
     public function show($id)
     {
+        $user = auth()->user();
         $attendance = Attendance::with('employee.user')->findOrFail($id);
+        
+        // Check authorization
+        if ($user->isAdmin()) {
+            // Admin can only view attendances of their employees
+            if ($attendance->employee->admin_id !== $user->id) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+        } else {
+            // Employee can only view their own attendance
+            if (!$user->employee || $attendance->employee_id !== $user->employee->id) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+        }
+        
         return response()->json($attendance);
     }
 
@@ -148,6 +163,16 @@ class AttendanceController extends Controller
     {
         if (!$request->user()->isAdmin()) {
             return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        
+        // Verify employee belongs to this admin's tenant
+        $adminId = $request->user()->id;
+        $employee = \App\Models\Employee::where('id', $employeeId)
+            ->where('admin_id', $adminId)
+            ->first();
+        
+        if (!$employee) {
+            return response()->json(['message' => 'Employee not found or does not belong to your tenant'], 404);
         }
 
         $validator = Validator::make($request->all(), [
@@ -202,6 +227,11 @@ class AttendanceController extends Controller
 
         $attendance = Attendance::findOrFail($id);
         
+        // Verify admin owns this attendance (via employee ownership)
+        if ($attendance->employee->admin_id !== $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        
         // Only allow edit within 7 days
         if (Carbon::parse($attendance->date)->diffInDays(Carbon::now()) > 7) {
             return response()->json(['message' => 'Can only edit attendance within 7 days'], 403);
@@ -243,6 +273,11 @@ class AttendanceController extends Controller
         }
 
         $attendance = Attendance::findOrFail($id);
+        
+        // Verify admin owns this attendance (via employee ownership)
+        if ($attendance->employee->admin_id !== $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
         
         // Only allow delete within 7 days
         if (Carbon::parse($attendance->date)->diffInDays(Carbon::now()) > 7) {
