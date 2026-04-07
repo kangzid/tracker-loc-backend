@@ -202,7 +202,10 @@ class AttendanceController extends Controller
         $result = [];
         for ($day = 1; $day <= $daysInMonth; $day++) {
             $date = Carbon::create($year, $month, $day)->format('Y-m-d');
-            $attendance = $attendances->firstWhere('date', $date);
+            // Find attendance by comparing formatted dates (handle timezone properly)
+            $attendance = $attendances->first(function($item) use ($date) {
+                return $item->date->format('Y-m-d') === $date;
+            });
             
             $result[] = [
                 'date' => $date,
