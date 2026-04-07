@@ -388,16 +388,26 @@ class AttendanceController extends Controller
         ]);
     }
 
-    public function cleanupOldAttendances()
+    public function cleanupOldAttendances(Request $request)
     {
-        // Delete attendances older than 3 months
-        $threeMonthsAgo = Carbon::now()->subMonths(3);
+        $request->validate([
+            'before_date' => 'required|date_format:Y-m-d',
+        ]);
+
+        $beforeDate = $request->input('before_date');
         
-        $deletedCount = Attendance::where('date', '<', $threeMonthsAgo->format('Y-m-d'))->delete();
+        // Convert string to Carbon date for proper comparison
+        $beforeDateCarbon = Carbon::createFromFormat('Y-m-d', $beforeDate)->startOfDay();
+        
+        // Delete attendances before the specified date, only for this admin's tenant
+        $deletedCount = Attendance::where('admin_id', $request->user()->id)
+            ->where('date', '<', $beforeDateCarbon)
+            ->delete();
         
         return response()->json([
             'message' => 'Old attendances cleaned up successfully',
-            'deleted_count' => $deletedCount
+            'deleted_count' => $deletedCount,
+            'before_date' => $beforeDate
         ]);
     }
 
