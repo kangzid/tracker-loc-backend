@@ -61,6 +61,7 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Admin attendance management
     Route::get('/admin/attendances/employee/{employeeId}', [AttendanceController::class, 'getEmployeeAttendances']);
+    Route::post('/admin/attendances', [AttendanceController::class, 'storeAdmin']); // Create attendance manually
     Route::put('/admin/attendances/{id}', [AttendanceController::class, 'update']);
     Route::delete('/admin/attendances/{id}', [AttendanceController::class, 'destroy']);
     Route::post('/admin/attendances/cleanup', [AttendanceController::class, 'cleanupOldAttendances']);

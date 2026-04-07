@@ -292,6 +292,78 @@ class AttendanceController extends Controller
         return response()->json(['message' => 'Attendance deleted successfully']);
     }
 
+    /**
+     * Admin manual attendance creation for gap-filling
+     * Used when employee forgot to check-in or for manual corrections
+     */
+    public function storeAdmin(Request $request)
+    {
+        if (!$request->user()->isAdmin()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'employee_id' => 'required|integer|exists:employees,id',
+            'date' => 'required|date_format:Y-m-d',
+            'status' => 'required|in:present,late,absent,sick,leave',
+            'check_in' => 'nullable|date_format:H:i',
+            'check_out' => 'nullable|date_format:H:i',
+            'notes' => 'nullable|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        // Verify employee belongs to this admin's tenant
+        $adminId = $request->user()->id;
+        $employee = \App\Models\Employee::where('id', $request->employee_id)
+            ->where('admin_id', $adminId)
+            ->first();
+        
+        if (!$employee) {
+            return response()->json(['message' => 'Employee not found or does not belong to your tenant'], 404);
+        }
+
+        // Check if attendance already exists for this date
+        $existingAttendance = Attendance::where('employee_id', $request->employee_id)
+            ->where('date', $request->date)
+            ->first();
+
+        if ($existingAttendance) {
+            return response()->json([
+                'message' => 'Attendance record already exists for this date',
+                'date' => $request->date,
+                'existing_id' => $existingAttendance->id,
+                'note' => 'Use update endpoint to modify existing record'
+            ], 409);
+        }
+
+        $attendanceData = [
+            'employee_id' => $request->employee_id,
+            'date' => $request->date,
+            'status' => $request->status,
+            'notes' => $request->notes,
+        ];
+
+        // Add check-in if provided
+        if ($request->check_in) {
+            $attendanceData['check_in'] = Carbon::parse($request->date . ' ' . $request->check_in);
+        }
+
+        // Add check-out if provided
+        if ($request->check_out) {
+            $attendanceData['check_out'] = Carbon::parse($request->date . ' ' . $request->check_out);
+        }
+
+        $attendance = Attendance::create($attendanceData);
+
+        return response()->json([
+            'message' => 'Attendance record created successfully',
+            'data' => $attendance->load('employee.user')
+        ], 201);
+    }
+
     public function checkLocation(Request $request)
     {
         $validator = Validator::make($request->all(), [
