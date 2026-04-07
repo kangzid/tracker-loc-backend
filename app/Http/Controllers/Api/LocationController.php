@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Location;
 use App\Models\Employee;
 use App\Models\Vehicle;
+use App\Events\LocationUpdated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -27,14 +28,17 @@ class LocationController extends Controller
         }
 
         // Verify ownership for employee tracking
+        $entityName = null;
         if ($request->trackable_type === 'employee') {
             $employee = $request->user()->employee;
             if (!$employee || $employee->id != $request->trackable_id) {
                 return response()->json(['message' => 'Unauthorized'], 403);
             }
             $trackable = $employee;
+            $entityName = $employee->user->name;
         } else {
             $trackable = Vehicle::findOrFail($request->trackable_id);
+            $entityName = $trackable->vehicle_number;
         }
 
         // Update or create latest location (only keep one record per trackable)
@@ -58,6 +62,18 @@ class LocationController extends Controller
             'longitude' => $request->longitude,
             'last_location_update' => now(),
         ]);
+
+        // Broadcast location update via WebSocket untuk real-time tracking
+        LocationUpdated::dispatch(
+            $request->trackable_type,
+            $request->trackable_id,
+            $request->latitude,
+            $request->longitude,
+            $request->speed,
+            $request->accuracy,
+            now(),
+            $entityName
+        );
 
         return response()->json($location, 201);
     }

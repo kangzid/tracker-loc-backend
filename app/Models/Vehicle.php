@@ -24,6 +24,16 @@ class Vehicle extends Model
         'token_generated_at',
     ];
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Auto-delete all location history when vehicle is deleted
+        static::deleting(function ($vehicle) {
+            $vehicle->locations()->delete();
+        });
+    }
+
     protected function casts(): array
     {
         return [

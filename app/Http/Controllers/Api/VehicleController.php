@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Vehicle;
 use App\Models\Location;
+use App\Events\LocationUpdated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -106,9 +107,16 @@ class VehicleController extends Controller
 
         $adminId = $request->user()->id;
         $vehicle = Vehicle::where('admin_id', $adminId)->findOrFail($id);
+        
+        // Cascade delete: hapus semua location history yang terkait dengan vehicle ini
+        Location::where('trackable_type', Vehicle::class)
+            ->where('trackable_id', $id)
+            ->delete();
+        
+        // Kemudian hapus vehicle-nya
         $vehicle->delete();
 
-        return response()->json(['message' => 'Vehicle deleted successfully']);
+        return response()->json(['message' => 'Vehicle and all location history deleted successfully']);
     }
 
     public function activeVehicles(Request $request)
@@ -178,6 +186,18 @@ class VehicleController extends Controller
             'accuracy' => $request->accuracy,
             'recorded_at' => now(),
         ]);
+
+        // Broadcast location update via WebSocket untuk real-time tracking
+        LocationUpdated::dispatch(
+            'vehicle',
+            $id,
+            $request->latitude,
+            $request->longitude,
+            $request->speed,
+            $request->accuracy,
+            now(),
+            $vehicle->vehicle_number
+        );
 
         return response()->json([
             'vehicle' => $vehicle,

@@ -11,7 +11,7 @@ import json
 
 # Configuration
 API_URL = "http://localhost:8000/api/gps"
-TRACKING_TOKEN = "53f424c1e149bd551a0e43a95e418fd57fc9cf317e6550bf5dddaaacdbe07c9e"  # Ganti dengan token vehicle Anda
+TRACKING_TOKEN = "5a29b4f206d17e021b57c51cc9c7d8f58b9504c8d36999ed992a40a3939a7b18"  # Ganti dengan token vehicle Anda
 
 # Starting location (Jakarta)
 START_LAT = -6.200000

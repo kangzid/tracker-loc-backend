@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Vehicle;
 use App\Models\Location;
+use App\Events\LocationUpdated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -64,7 +65,7 @@ class GpsTrackingController extends Controller
         ]);
 
         // Save to location history
-        Location::create([
+        $location = Location::create([
             'trackable_type' => Vehicle::class,
             'trackable_id' => $vehicle->id,
             'latitude' => $request->latitude,
@@ -73,6 +74,18 @@ class GpsTrackingController extends Controller
             'accuracy' => $request->accuracy,
             'recorded_at' => now(),
         ]);
+
+        // Broadcast real-time update to Pusher
+        LocationUpdated::dispatch(
+            'vehicle',
+            $vehicle->id,
+            $request->latitude,
+            $request->longitude,
+            $request->speed ?? 0,
+            $request->accuracy ?? 0,
+            now(),
+            $vehicle->vehicle_number
+        );
 
         return response()->json([
             'success' => true,

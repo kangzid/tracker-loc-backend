@@ -22,6 +22,16 @@ class Employee extends Model
         'last_location_update',
     ];
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Auto-delete all location history when employee is deleted
+        static::deleting(function ($employee) {
+            $employee->locations()->delete();
+        });
+    }
+
     protected function casts(): array
     {
         return [
