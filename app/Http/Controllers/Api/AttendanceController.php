@@ -400,7 +400,10 @@ class AttendanceController extends Controller
         $beforeDateCarbon = Carbon::createFromFormat('Y-m-d', $beforeDate)->startOfDay();
         
         // Delete attendances before the specified date, only for this admin's tenant
-        $deletedCount = Attendance::where('admin_id', $request->user()->id)
+        // Using whereHas to filter by employee's admin_id (tenant isolation)
+        $deletedCount = Attendance::whereHas('employee', function ($query) use ($request) {
+            $query->where('admin_id', $request->user()->id);
+        })
             ->where('date', '<', $beforeDateCarbon)
             ->delete();
         
